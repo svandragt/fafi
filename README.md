@@ -1,12 +1,13 @@
-# faff
-Favourites Firefox indexing and search tool.
+# FaFF
+Search Firefox bookmark contents, with this commandline client. FaFF indexes the main content of the pages into a plain text database and allows you to use linux tools to search through them.
 
 WIP:
 
  * Extract main text content from all bookmarks into ./data/*.txt files
  * Skips .local domains
+ * Skips pages that are already indexed.
 
-It does not return the URLs yet, although they're the first line in the text file.
+URLs are stored in the first line of the text.
 
 ```
 # Setup data directory.
