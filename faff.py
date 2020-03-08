@@ -23,8 +23,7 @@ def select_bookmarks(cursor):
     JOIN 
         moz_bookmarks on moz_bookmarks.fk=moz_places.id 
     WHERE 
-        visit_count>0
-        and moz_places.url like 'http%'
+        moz_places.url like 'http%'
     ORDER BY 
         dateAdded desc
     """
