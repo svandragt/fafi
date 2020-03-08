@@ -6,6 +6,9 @@ from contextlib import closing
 import hashlib
 from subprocess import call
 import newspaper
+import appdirs
+
+faff = None
 
 # execute a query on sqlite cursor
 def execute_query(cursor, query):
@@ -40,15 +43,14 @@ def create_temporary_copy(path):
 
 def get_bookmarks_path():
     # set the path of firefox folder with databases
-    bookmarks_path = "/home/sander/.mozilla/firefox/"
-    # get firefox profile
-    profiles = [i for i in os.listdir(bookmarks_path) if i.endswith(".default-release")]
-    # get sqlite database of firefox bookmarks
-    sqlite_path = bookmarks_path + profiles[0] + "/places.sqlite"
-    if os.path.exists(sqlite_path):
-        return sqlite_path
-    else:
-        return None
+    bookmarks_path = appdirs.user_data_dir("Firefox")
+
+    for root, dirs, files in os.walk(bookmarks_path + "/Profiles/"):
+        for name in files:
+            if name == "places.sqlite":
+                print("Indexing: ", root + os.sep + name)
+                return root + os.sep + name
+    return None
 
 
 def create_connection(db_file):
@@ -67,51 +69,64 @@ def create_connection(db_file):
     return conn
 
 
-def create_table(conn, create_table_sql):
-    """ create a table from the create_table_sql statement
+def create_table(conn, table_sql):
+    """ create a table from the table_sql statement
     :param conn: Connection object
-    :param create_table_sql: a CREATE TABLE statement
+    :param table_sql: a CREATE TABLE statement
     :return:
     """
     try:
         c = conn.cursor()
-        c.execute(create_table_sql)
+        c.execute(table_sql)
+        conn.commit()
     except sqlite3.Error as e:
         print(e)
 
 
-def index(row):
+def index_site(row):
     url = row[0]
     if ".local" in url:
         return
+
     h = hashlib.sha256(url.encode("utf-8")).hexdigest()
-    filename = "./data/" + h + ".txt"
-    if os.path.exists(filename) is False:
-        article = newspaper.Article(url)
-        try:
-            article.download()
-            article.parse()
-        except newspaper.article.ArticleException:
-            print("E", url)
-            return
-        print("✓", url)
 
-        with open(filename, "w") as f:
-            f.write("URL: " + url + "\n\n")
+    c = faff.cursor()
+    c.execute("SELECT hash FROM sites WHERE hash=?", (h,))
+    if c.fetchone():
+        print("=", url)
+        return
 
-            f.write(article.text)
+    article = newspaper.Article(url)
+    try:
+        article.download()
+        article.parse()
+    except newspaper.article.ArticleException:
+        print("E", url)
+        return
+    print("✓", url)
+
+    c.execute(
+        "INSERT INTO sites (url, hash, text) VALUES(?,?,?)", (url, h, article.text)
+    )
+    faff.commit()
 
 
 if __name__ == "__main__":
     path = get_bookmarks_path()
     if path:
-        print("Connecting...")
         temp_path = create_temporary_copy(path)
 
         with create_connection(temp_path) as places:
             with closing(places.cursor()) as ff_cursor:
                 ff_cursor = select_bookmarks(ff_cursor)
 
-                for row in ff_cursor:
-                    index(row)
+                if not os.path.exists("./data"):
+                    os.makedirs("./data")
+                with create_connection("./data/faff.sqlite") as faff:
+                    create_table(
+                        faff,
+                        "CREATE TABLE IF NOT EXISTS sites ( id INTEGER PRIMARY KEY AUTOINCREMENT, url VARCHAR UNIQUE, hash VARCHAR UNIQUE , text TEXT )",
+                    )
 
+                    for row in ff_cursor:
+                        index_site(row)

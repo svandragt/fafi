@@ -9,6 +9,7 @@ black = "*"
 
 [packages]
 newspaper3k = "*"
+appdirs = "*"
 
 [requires]
 python_version = "3.6"
