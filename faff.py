@@ -134,7 +134,7 @@ def do_search(query):
     if os.path.exists("./data/faff.sqlite"):
         with create_connection("./data/faff.sqlite") as faff:
             cursor = faff.execute(
-                "SELECT url,text FROM sites WHERE text MATCH ?", (query,)
+                "SELECT url,text FROM sites WHERE text MATCH ? ORDER BY rank", (query,)
             )
             if cursor.rowcount == 0:
                 print("No results.")
