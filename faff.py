@@ -134,7 +134,18 @@ def do_search(query):
     if os.path.exists("./data/faff.sqlite"):
         with create_connection("./data/faff.sqlite") as faff:
             cursor = faff.execute(
-                "SELECT url,text FROM sites WHERE text MATCH ? ORDER BY rank", (query,)
+                """SELECT 
+                        url, 
+                        snippet(sites, 1,'[', ']', '...',32) 
+                    FROM 
+                        sites 
+                    WHERE 
+                        text MATCH ? 
+                    ORDER BY 
+                        rank 
+                    LIMIT 7
+                """,
+                (query,),
             )
             if cursor.rowcount == 0:
                 print("No results.")
@@ -142,7 +153,9 @@ def do_search(query):
 
             i = 1
             for row in cursor:
-                print(str(i) + ")", row[0])
+                print(
+                    str(i) + ")", row[0], "\n", row[1].replace("\n", " ").strip(), "\n"
+                )
                 i += 1
 
 
