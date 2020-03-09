@@ -22,17 +22,8 @@ chmod +x faff.py
 
 # Index bookmarks
 ./faff.py index
-> Indexing:  ~/Library/Application Support/Firefox/Profiles/31bwvkr0.dev-edition-default-1583536459682/places.sqlite
-> = https://github.com/humanmade/Cavalcade-Runner/blob/master/inc/class-runner.php#L236-L239
-> = https://gist.github.com/svandragt/99274f1f486b55964407d8c5d26a8c64
-> ...
 
-# Search for VPN
-./faff.py search vpn
-
-> Searching for: vpn
-> 1) https://firejail.wordpress.com/
-> 2) https://blog.elementary.io/introducing-elementary-os-5-1-hera/
-> 3) https://arstechnica.com/gadgets/2019/12/nebula-vpn-routes-between-hosts-privately-flexibly-and-efficiently/
+# Search for linux
+./faff.py search 'linux'
 ```
-
+![search query](https://user-images.githubusercontent.com/594871/76201330-ffcba880-61ea-11ea-9fdd-cc32a90deecd.png)
