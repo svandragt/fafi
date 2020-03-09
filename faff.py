@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import os
 import sqlite3
 import tempfile
@@ -7,6 +9,8 @@ import hashlib
 from subprocess import call
 import newspaper
 import appdirs
+import argparse
+
 
 faff = None
 
@@ -75,23 +79,18 @@ def create_table(conn, table_sql):
     :param table_sql: a CREATE TABLE statement
     :return:
     """
-    try:
-        c = conn.cursor()
-        c.execute(table_sql)
-        conn.commit()
-    except sqlite3.Error as e:
-        print(e)
+    c = conn.cursor()
+    c.execute(table_sql)
+    conn.commit()
 
 
-def index_site(row):
+def index_site(conn, row):
     url = row[0]
     if ".local" in url:
         return
 
-    h = hashlib.sha256(url.encode("utf-8")).hexdigest()
-
-    c = faff.cursor()
-    c.execute("SELECT hash FROM sites WHERE hash=?", (h,))
+    c = conn.cursor()
+    c.execute("SELECT url FROM sites WHERE url=?", (url,))
     if c.fetchone():
         print("=", url)
         return
@@ -105,13 +104,11 @@ def index_site(row):
         return
     print("✓", url)
 
-    c.execute(
-        "INSERT INTO sites (url, hash, text) VALUES(?,?,?)", (url, h, article.text)
-    )
-    faff.commit()
+    c.execute("INSERT INTO sites (url, text) VALUES(?,?)", (url, article.text))
+    conn.commit()
 
 
-if __name__ == "__main__":
+def do_index(args):
     path = get_bookmarks_path()
     if path:
         temp_path = create_temporary_copy(path)
@@ -125,8 +122,38 @@ if __name__ == "__main__":
                 with create_connection("./data/faff.sqlite") as faff:
                     create_table(
                         faff,
-                        "CREATE TABLE IF NOT EXISTS sites ( id INTEGER PRIMARY KEY AUTOINCREMENT, url VARCHAR UNIQUE, hash VARCHAR UNIQUE , text TEXT )",
+                        "CREATE VIRTUAL TABLE IF NOT EXISTS sites USING FTS5(url, text)",
                     )
 
                     for row in ff_cursor:
-                        index_site(row)
+                        index_site(faff, row)
+
+
+def do_search(query):
+    print("Searching for:", query)
+    if os.path.exists("./data/faff.sqlite"):
+        with create_connection("./data/faff.sqlite") as faff:
+            cursor = faff.execute(
+                "SELECT url,text FROM sites WHERE text MATCH ?", (query,)
+            )
+            if cursor.rowcount == 0:
+                print("No results.")
+                return
+
+            i = 1
+            for row in cursor:
+                print(str(i) + ")", row[0])
+                i += 1
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(usage="faff [command] [options]")
+    parser.add_argument("task", help="Index bookmarks.", nargs="?")
+    parser.add_argument("value", help="Search for keywords.", nargs="?")
+
+    args = parser.parse_args()
+
+    if args.task == "index":
+        do_index(args)
+    if args.task == "search":
+        do_search(args.value)
