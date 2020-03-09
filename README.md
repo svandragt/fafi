@@ -1,29 +1,31 @@
 # FaFF
-Search Firefox bookmark contents, with this commandline client. FaFF indexes the main content of the pages into a plain text database and allows you to use linux tools to search through them.
+Search Firefox bookmark contents, with this commandline client. FaFF extracts the content of the bookmarks and stores them into a searchable SQLite database.
 
 WIP:
 
- * Extract main text content from all bookmarks into ./data/*.txt files
+ * Detects your places database from the Firefox profile folder.
+ * Extract main text content from all bookmarks into `./data/faff.sqlite`.
  * Skips .local domains
  * Skips pages that are already indexed.
 
-URLs are stored in the first line of the text.
+URLs are stored together with the main page context as determined by [Newspaper](https://github.com/codelucas/newspaper).
 
 ```
-# Setup data directory.
-mkdir data
-
 # Install project requirements.
 pipenv install
 
-# Update path to your places.sqlite location.
-nano faff.py
+# Log in to a python shell
+pipenv shell
 
-# Index bookmarks 
-pipenv run python ./faff.py
+# Make faff executable
+chmod +x faff.py
 
-# Search for bookmarks containing a query such as 'vpn'
-grep -iR 'vpn' data
+# Index then search for VPN
+./faff.py index
+./faff.py search vpn
+  Searching for: vpn
+  1) https://firejail.wordpress.com/
+  2) https://blog.elementary.io/introducing-elementary-os-5-1-hera/
+  3) https://arstechnica.com/gadgets/2019/12/nebula-vpn-routes-between-hosts-privately-flexibly-and-efficiently/
 ```
 
-![output](https://user-images.githubusercontent.com/594871/76162502-4ad7b400-6136-11ea-824a-72ccda1cada7.png)
