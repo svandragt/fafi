@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 
-import os
-import sqlite3
-import tempfile
-import shutil
 from contextlib import closing
-import hashlib
 from subprocess import call
-import newspaper
 import appdirs
 import argparse
+import click
+import hashlib
+import newspaper
+import os
+import shutil
+import sqlite3
+import tempfile
 
 
 faff = None
@@ -84,7 +85,7 @@ def create_table(conn, table_sql):
     conn.commit()
 
 
-def index_site(conn, row):
+def index_site(conn, row, verbose):
     url = row[0]
     if ".local" in url:
         return
@@ -92,7 +93,8 @@ def index_site(conn, row):
     c = conn.cursor()
     c.execute("SELECT url FROM sites WHERE url=?", (url,))
     if c.fetchone():
-        print("=", url)
+        if verbose:
+            print("=", url)
         return
 
     article = newspaper.Article(url)
@@ -108,7 +110,14 @@ def index_site(conn, row):
     conn.commit()
 
 
-def do_index(args):
+@click.group()
+def cli():
+    pass
+
+
+@click.command("index")
+@click.option("-v", "--verbose", is_flag=True, help="Enables verbose mode")
+def do_index(verbose):
     path = get_bookmarks_path()
     if path:
         temp_path = create_temporary_copy(path)
@@ -126,9 +135,11 @@ def do_index(args):
                     )
 
                     for row in ff_cursor:
-                        index_site(faff, row)
+                        index_site(faff, row, verbose)
 
 
+@click.command("search")
+@click.argument("query")
 def do_search(query):
     print("Searching for:", query)
     if os.path.exists("./data/faff.sqlite"):
@@ -159,14 +170,8 @@ def do_search(query):
                 i += 1
 
 
+cli.add_command(do_index)
+cli.add_command(do_search)
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(usage="faff [command] [options]")
-    parser.add_argument("task", help="Index bookmarks.", nargs="?")
-    parser.add_argument("value", help="Search for keywords.", nargs="?")
-
-    args = parser.parse_args()
-
-    if args.task == "index":
-        do_index(args)
-    if args.task == "search":
-        do_search(args.value)
+    cli()
