@@ -95,7 +95,7 @@ def index_site(conn, row, verbose):
     if c.fetchone():
         if verbose:
             print("=", url)
-        return
+        return "="
 
     article = newspaper.Article(url)
     try:
@@ -103,11 +103,12 @@ def index_site(conn, row, verbose):
         article.parse()
     except newspaper.article.ArticleException:
         print("E", url)
-        return
-    print("✓", url)
+        return "E"
 
+    print("✓", url)
     c.execute("INSERT INTO sites (url, text) VALUES(?,?)", (url, article.text))
     conn.commit()
+    return "+"
 
 
 @click.group()
@@ -116,9 +117,16 @@ def cli():
 
 
 @click.command("index")
+@click.option(
+    "--stop-when-exists",
+    default=10,
+    show_default=True,
+    help="Stop indexing after <int> existing sites.",
+)
 @click.option("-v", "--verbose", is_flag=True, help="Enables verbose mode")
-def do_index(verbose):
+def do_index(verbose, stop_when_exists):
     path = get_bookmarks_path()
+    exists = 0
     if path:
         temp_path = create_temporary_copy(path)
 
@@ -135,7 +143,14 @@ def do_index(verbose):
                     )
 
                     for row in ff_cursor:
-                        index_site(faff, row, verbose)
+                        o = index_site(faff, row, verbose)
+                        if o == "=":
+                            exists += 1
+                            if stop_when_exists != -1 and exists >= stop_when_exists:
+                                return
+                            continue
+                        # Reset on error or new index
+                        exists = 0
 
 
 @click.command("search")
