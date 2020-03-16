@@ -155,7 +155,10 @@ def do_index(verbose, stop_when_exists):
 
 @click.command("search")
 @click.argument("query")
-def do_search(query):
+@click.option(
+    "--max-results", default=7, show_default=True, help="Return <int> results",
+)
+def do_search(query, max_results):
     print("Searching for:", query)
     if os.path.exists("./data/faff.sqlite"):
         with create_connection("./data/faff.sqlite") as faff:
@@ -169,9 +172,9 @@ def do_search(query):
                         text MATCH ? 
                     ORDER BY 
                         rank 
-                    LIMIT 7
+                    LIMIT ?
                 """,
-                (query,),
+                (query, max_results),
             )
             if cursor.rowcount == 0:
                 print("No results.")
