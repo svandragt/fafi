@@ -1,8 +1,8 @@
 
-FaFF
+Fafi
 ====
 
-Search Firefox bookmark contents, with this commandline client. FaFF extracts the content of the bookmarks and stores them into a searchable SQLite database.
+Search Firefox bookmark contents, with this commandline client. Fafi extracts the content of the bookmarks and stores them into a searchable SQLite database.
 
 Things it does:
 
