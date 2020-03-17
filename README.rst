@@ -16,15 +16,14 @@ Things it does:
 URLs are stored together with the main page context as determined by `Newspaper <https://github.com/codelucas/newspaper>`_.
 
 Users
-==
-.. code-block::
+-----
+
    pipx install fafi
    fafi index
    fafi search 'linux'
 
 Developers
-==
-.. code-block::
+----------
 
    # Install project requirements.
    poetry install
