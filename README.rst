@@ -17,14 +17,18 @@ URLs are stored together with the main page context as determined by `Newspaper 
 
 Users
 -----
+
 .. code-block::
+
    pipx install fafi
    fafi index
    fafi search 'linux'
 
 Developers
 ----------
+
 .. code-block::
+
    # Install project requirements.
    poetry install
 
