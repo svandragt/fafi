@@ -15,22 +15,31 @@ Things it does:
 
 URLs are stored together with the main page context as determined by `Newspaper <https://github.com/codelucas/newspaper>`_.
 
+Users
+==
+.. code-block::
+   pipx install fafi
+   fafi index
+   fafi search 'linux'
+
+Developers
+==
 .. code-block::
 
    # Install project requirements.
-   pipenv install
+   poetry install
 
    # Log in to a python shell
-   pipenv shell
+   poetry shell
 
    # Make faff executable
-   chmod +x faff.py
+   chmod +x fafi.py
 
    # Index bookmarks
-   ./faff.py index
+   ./fafi.py index
 
    # Search for linux
-   ./faff.py search 'linux'
+   ./fafi.py search 'linux'
 
 
 .. image:: https://user-images.githubusercontent.com/594871/76201330-ffcba880-61ea-11ea-9fdd-cc32a90deecd.png
