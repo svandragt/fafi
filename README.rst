@@ -8,8 +8,8 @@ Things it does:
 
 
 * Detects your places database from the Firefox profile folder.
-* Extract main text content from all bookmarks into ``./data/faff.sqlite``.
-* Skips .local domains
+* Extract main text content from all bookmarks into ``<user_data_dir>/fafi/data.sqlite``.
+* Skips .local and .test domains.
 * Skips pages that are already indexed.
 * Search results are ranked by relevance and displayed with snippets.
 
