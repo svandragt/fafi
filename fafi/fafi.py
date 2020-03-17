@@ -13,7 +13,7 @@ import sqlite3
 import tempfile
 
 
-faff = None
+fafi = None
 
 # execute a query on sqlite cursor
 def execute_query(cursor, query):
@@ -136,14 +136,14 @@ def do_index(verbose, stop_when_exists):
 
                 if not os.path.exists("./data"):
                     os.makedirs("./data")
-                with create_connection("./data/faff.sqlite") as faff:
+                with create_connection("./data/fafi.sqlite") as fafi:
                     create_table(
-                        faff,
+                        fafi,
                         "CREATE VIRTUAL TABLE IF NOT EXISTS sites USING FTS5(url, text)",
                     )
 
                     for row in ff_cursor:
-                        o = index_site(faff, row, verbose)
+                        o = index_site(fafi, row, verbose)
                         if o == "=":
                             exists += 1
                             if stop_when_exists != -1 and exists >= stop_when_exists:
@@ -160,9 +160,9 @@ def do_index(verbose, stop_when_exists):
 )
 def do_search(query, max_results):
     print("Searching for:", query)
-    if os.path.exists("./data/faff.sqlite"):
-        with create_connection("./data/faff.sqlite") as faff:
-            cursor = faff.execute(
+    if os.path.exists("./data/fafi.sqlite"):
+        with create_connection("./data/fafi.sqlite") as fafi:
+            cursor = fafi.execute(
                 """SELECT 
                         url, 
                         snippet(sites, 1,'[', ']', '...',32) 
