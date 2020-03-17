@@ -4,6 +4,7 @@ version = "0.1.4"
 description = "CLI for indexing Firefox bookmarks."
 authors = ["Sander van Dragt <sander@vandragt.com>"]
 license = "MIT"
+readme = "README.rst"
 
 [tool.poetry.dependencies]
 python = "^3.7"
