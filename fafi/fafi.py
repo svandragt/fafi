@@ -15,7 +15,8 @@ import db
 
 def index_site(conn, row, verbose):
     url = row[0]
-    if ".local" in url:
+    if any(x in url for x in [".local", ".test"]):
+        print("S", url)
         return
 
     c = conn.cursor()
