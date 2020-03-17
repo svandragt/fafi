@@ -21,6 +21,7 @@ Users
 .. code-block::
 
    pipx install fafi
+   fafi --help
    fafi index
    fafi search 'linux'
 
@@ -38,6 +39,9 @@ Developers
    # Make faff executable
    chmod +x fafi.py
 
+   # Help on commands
+   ./fafi.py --help
+   
    # Index bookmarks
    ./fafi.py index
 
