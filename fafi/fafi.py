@@ -2,87 +2,15 @@
 
 from contextlib import closing
 from subprocess import call
-import appdirs
 import argparse
 import click
 import hashlib
 import newspaper
 import os
-import shutil
-import sqlite3
-import tempfile
 
-
-fafi = None
-
-# execute a query on sqlite cursor
-def execute_query(cursor, query):
-    try:
-        cursor.execute(query)
-    except Exception as error:
-        print(str(error) + "\n " + query)
-
-
-# get bookmarks from firefox sqlite database file and print all
-def select_bookmarks(cursor):
-    bookmarks_query = """
-    SELECT DISTINCT
-        url, moz_places.title from moz_places  
-    JOIN 
-        moz_bookmarks on moz_bookmarks.fk=moz_places.id 
-    WHERE 
-        moz_places.url like 'http%'
-    ORDER BY 
-        dateAdded desc
-    """
-    execute_query(cursor, bookmarks_query)
-    return cursor
-
-
-def create_temporary_copy(path):
-    temp_dir = tempfile.gettempdir()
-    temp_path = os.path.join(temp_dir, "temp_file_name")
-    shutil.copy2(path, temp_path)
-    return temp_path
-
-
-def get_bookmarks_path():
-    # set the path of firefox folder with databases
-    bookmarks_path = appdirs.user_data_dir("Firefox")
-
-    for root, dirs, files in os.walk(bookmarks_path + "/Profiles/"):
-        for name in files:
-            if name == "places.sqlite":
-                print("Indexing: ", root + os.sep + name)
-                return root + os.sep + name
-    return None
-
-
-def create_connection(db_file):
-    """ create a database connection to the SQLite database
-        specified by db_file
-    :param db_file: database file
-    :return: Connection object or None
-    """
-    conn = None
-    try:
-        conn = sqlite3.connect(db_file)
-        return conn
-    except sqlite3.Error as e:
-        print(e)
-
-    return conn
-
-
-def create_table(conn, table_sql):
-    """ create a table from the table_sql statement
-    :param conn: Connection object
-    :param table_sql: a CREATE TABLE statement
-    :return:
-    """
-    c = conn.cursor()
-    c.execute(table_sql)
-    conn.commit()
+# fafi
+import appdata
+import db
 
 
 def index_site(conn, row, verbose):
@@ -125,19 +53,18 @@ def cli():
 )
 @click.option("-v", "--verbose", is_flag=True, help="Enables verbose mode")
 def do_index(verbose, stop_when_exists):
-    path = get_bookmarks_path()
+    bm_db = appdata.get_bookmarks_db()
     exists = 0
-    if path:
-        temp_path = create_temporary_copy(path)
+    if bm_db:
+        temp_path = appdata.create_temporary_copy(bm_db)
 
-        with create_connection(temp_path) as places:
+        with db.create_connection(temp_path) as places:
             with closing(places.cursor()) as ff_cursor:
-                ff_cursor = select_bookmarks(ff_cursor)
+                ff_cursor = appdata.select_bookmarks(ff_cursor)
 
-                if not os.path.exists("./data"):
-                    os.makedirs("./data")
-                with create_connection("./data/fafi.sqlite") as fafi:
-                    create_table(
+                db_path = appdata.db_path()
+                with db.create_connection(db_path) as fafi:
+                    db.create_table(
                         fafi,
                         "CREATE VIRTUAL TABLE IF NOT EXISTS sites USING FTS5(url, text)",
                     )
@@ -160,8 +87,9 @@ def do_index(verbose, stop_when_exists):
 )
 def do_search(query, max_results):
     print("Searching for:", query)
-    if os.path.exists("./data/fafi.sqlite"):
-        with create_connection("./data/fafi.sqlite") as fafi:
+    db_path = appdata.db_path()
+    if os.path.exists(db_path):
+        with db.create_connection(db_path) as fafi:
             cursor = fafi.execute(
                 """SELECT 
                         url, 

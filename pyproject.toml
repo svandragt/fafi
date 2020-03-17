@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "fafi"
-version = "0.1.4"
+version = "0.1.5"
 description = "CLI for indexing Firefox bookmarks."
 authors = ["Sander van Dragt <sander@vandragt.com>"]
 license = "MIT"
