@@ -17,14 +17,13 @@ def create_connection(db_file):
     return conn
 
 
-def create_table(conn, table_sql):
+def create_table(conn):
     """ create a table from the table_sql statement
     :param conn: Connection object
-    :param table_sql: a CREATE TABLE statement
     :return:
     """
     c = conn.cursor()
-    c.execute(table_sql)
+    c.execute("CREATE VIRTUAL TABLE IF NOT EXISTS sites USING FTS5(url, text)")
     conn.commit()
 
 
@@ -34,3 +33,23 @@ def execute_query(cursor, query):
         cursor.execute(query)
     except Exception as error:
         print(str(error) + "\n " + query)
+
+
+def search(conn, query, max_results):
+    cursor = conn.execute(
+        """SELECT 
+                url, 
+                snippet(sites, 1,'[', ']', '...',32) 
+            FROM 
+                sites 
+            WHERE 
+                text MATCH ? 
+            ORDER BY 
+                rank 
+            LIMIT ?
+        """,
+        (query, max_results),
+    )
+    if cursor.rowcount == 0:
+        return None
+    return cursor
