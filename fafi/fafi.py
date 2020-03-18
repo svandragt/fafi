@@ -59,12 +59,12 @@ def do_index(verbose, max_exists):
     if bm_db:
         temp_path = appdata.create_temporary_copy(bm_db)
 
-        with db.create_connection(temp_path) as places:
+        with db.connect(temp_path) as places:
             with closing(places.cursor()) as ff_cursor:
                 ff_cursor = appdata.select_bookmarks(ff_cursor)
 
                 db_path = appdata.db_path()
-                with db.create_connection(db_path) as fafi:
+                with db.connect(db_path) as fafi:
                     db.create_table(fafi)
 
                     for row in ff_cursor:
@@ -87,7 +87,7 @@ def do_search(query, max_results):
     print("Searching for:", query)
     db_path = appdata.db_path()
     if os.path.exists(db_path):
-        with db.create_connection(db_path) as fafi:
+        with db.connect(db_path) as fafi:
             cursor = db.search(fafi, query, max_results)
             if cursor is None:
                 print("No results.")
@@ -95,9 +95,9 @@ def do_search(query, max_results):
 
             i = 1
             for row in cursor:
-                print(
-                    str(i) + ")", row[0], "\n", row[1].replace("\n", " ").strip(), "\n"
-                )
+                url = row[0]
+                snippet = row[1].replace("\n", " ").strip()
+                print(str(i) + ")", url, "\n", snippet, "\n")
                 i += 1
 
 

@@ -1,7 +1,7 @@
 import sqlite3
 
 
-def create_connection(db_file):
+def connect(db_file):
     """ create a database connection to the SQLite database
         specified by db_file
     :param db_file: database file
