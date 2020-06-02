@@ -14,7 +14,7 @@ appdirs = "^1.4.3"
 
 [tool.poetry.dev-dependencies]
 black = "^19.10b0"
-pylint = "^2.4.4"
+pylint = "^2.5.2"
 pyinstaller = "^3.6"
 macholib = "^1.14"
 
