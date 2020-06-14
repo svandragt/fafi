@@ -53,7 +53,7 @@ def select_bookmarks(cursor):
     if not bm_date:
         bm_date = 100000
     d = datetime.datetime.fromtimestamp(bm_date / 1000000)
-    print("bm_date: " + str(d))
+    print("Indexing bookmarks added after: " + str(d))
     db.execute_query(cursor, bookmarks_query, [bm_date])
     return cursor
 

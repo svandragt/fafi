@@ -4,6 +4,7 @@ from contextlib import closing
 from subprocess import call
 import argparse
 import click
+import datetime
 import hashlib
 import newspaper
 import os
@@ -16,6 +17,7 @@ import db
 def index_site(conn, row, verbose):
     url = row[0]
     date_bm_added = row[2]
+    d = datetime.datetime.fromtimestamp(date_bm_added / 1000000)
     if any(x in url for x in [".local", ".test"]):
         print("S", url)
         return
@@ -35,7 +37,7 @@ def index_site(conn, row, verbose):
         print("E", article.download_exception_msg, article.url)
         return "E"
 
-    print("✓", url)
+    print("✓", url, "(", str(d), ")")
     c.execute(
         "INSERT INTO sites (url, text, date_bm_added) VALUES(?,?,?)",
         (url, article.text, date_bm_added),
@@ -50,16 +52,9 @@ def cli():
 
 
 @click.command("index")
-@click.option(
-    "--max-exists",
-    default=10,
-    show_default=True,
-    help="Stop after <int> sites have been indexed sequentially.",
-)
 @click.option("-v", "--verbose", is_flag=True, help="Enables verbose mode")
-def do_index(verbose, max_exists):
+def do_index(verbose):
     bm_db = appdata.get_places_db()
-    exists = 0
     if bm_db:
         temp_path = appdata.create_temporary_copy(bm_db)
 
@@ -74,12 +69,7 @@ def do_index(verbose, max_exists):
                     for row in ff_cursor:
                         o = index_site(fafi, row, verbose)
                         if o == "=":
-                            exists += 1
-                            if max_exists != -1 and exists >= max_exists:
-                                return
                             continue
-                        # Reset on error or new index
-                        exists = 0
 
 
 @click.command("search")
