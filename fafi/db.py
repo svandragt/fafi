@@ -23,19 +23,24 @@ def create_table(conn):
     :return:
     """
     c = conn.cursor()
-    c.execute("CREATE VIRTUAL TABLE IF NOT EXISTS sites USING FTS5(url, text)")
+    c.execute(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS sites USING FTS5(url, text, date_bm_added)"
+    )
     conn.commit()
 
 
 # execute a query on sqlite cursor
-def execute_query(cursor, query):
+def execute_query(cursor, query, args=None):
     try:
-        cursor.execute(query)
+        if args:
+            cursor.execute(query, args)
+        else:
+            cursor.execute(query)
     except Exception as error:
         print(str(error) + "\n " + query)
 
 
-def search(conn, query, max_results):
+def search(conn, keywords, max_results):
     cursor = conn.execute(
         """SELECT 
                 url, 
@@ -48,8 +53,25 @@ def search(conn, query, max_results):
                 rank 
             LIMIT ?
         """,
-        (query, max_results),
+        (keywords, max_results),
     )
     if cursor.rowcount == 0:
         return None
     return cursor
+
+
+def last_row_bm_date(conn):
+    cursor = conn.execute(
+        """SELECT 
+                date_bm_added
+            FROM 
+                sites
+            ORDER by date_bm_added DESC
+            LIMIT 1
+        """
+    )
+    if cursor.rowcount == 0:
+        return None
+
+    for row in cursor:
+        return row[0]
