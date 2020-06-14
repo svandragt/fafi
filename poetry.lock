@@ -19,10 +19,6 @@ lazy-object-proxy = ">=1.4.0,<1.5.0"
 six = ">=1.12,<2.0"
 wrapt = ">=1.11,<2.0"
 
-[package.dependencies.typed-ast]
-python = "<3.8"
-version = ">=1.4.0,<1.5"
-
 [[package]]
 category = "dev"
 description = "Classes Without Boilerplate"
@@ -422,8 +418,8 @@ python-versions = "*"
 version = "1.12.1"
 
 [metadata]
-content-hash = "ed143cdededfe9f2def319d65b80e2b0635899bce1e81a9381e0f66af04f11dc"
-python-versions = "^3.7"
+content-hash = "af74db52cb91c80f15bcb816fe44a8c247e51ea36681136b86928cdcaa6dd63b"
+python-versions = "^3.8"
 
 [metadata.files]
 appdirs = [
