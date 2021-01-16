@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "fafi"
-version = "0.2"
+version = "0.2.0"
 description = "CLI for indexing Firefox bookmarks."
 authors = ["Sander van Dragt <sander@vandragt.com>"]
 license = "MIT"
@@ -14,7 +14,7 @@ appdirs = "^1.4.3"
 
 [tool.poetry.dev-dependencies]
 black = "^19.10b0"
-pylint = "^2.4.4"
+pylint = "^2.6.0"
 
 [tool.poetry.scripts]
 fafi = 'fafi.fafi:cli'
