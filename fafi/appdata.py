@@ -12,19 +12,20 @@ def get_firefox_path():
     return appdirs.user_data_dir("Firefox")
 
 
-def get_places_db():
+def get_places_dbs():
 
     # set the path of firefox folder with databases
     ff_path = get_firefox_path()
 
     # recursively walk tha path
+    db_paths = []
     for root, dirs, files in os.walk(ff_path + "/Profiles/"):
         for name in files:
             if name == "places.sqlite":
                 db_path = str(root + os.sep + name).strip()
-                print("Indexing: ", db_path)
-                return db_path
-    return None
+                db_paths.append(db_path)
+
+    return db_paths
 
 
 def data_path(silent=False):
