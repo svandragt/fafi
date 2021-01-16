@@ -1,49 +1,13 @@
 #!/usr/bin/env python3
 
-from contextlib import closing
-from subprocess import call
-import argparse
 import click
-import datetime
-import hashlib
-import newspaper
 import os
 
 # fafi
 import appdata
+import app
+import input
 import db
-
-
-def index_site(conn, row, verbose):
-    url = row[0]
-    date_bm_added = row[2]
-    d = datetime.datetime.fromtimestamp(date_bm_added / 1000000)
-    if any(x in url for x in [".local", ".test"]):
-        print("S", url)
-        return
-
-    c = conn.cursor()
-    c.execute("SELECT url FROM sites WHERE url=?", (url,))
-    if c.fetchone():
-        if verbose:
-            print("=", url)
-        return "="
-
-    article = newspaper.Article(url)
-    try:
-        article.download()
-        article.parse()
-    except newspaper.article.ArticleException:
-        print("E", article.download_exception_msg, article.url)
-        return "E"
-
-    print("✓", url, "(", str(d), ")")
-    c.execute(
-        "INSERT INTO sites (url, text, date_bm_added) VALUES(?,?,?)",
-        (url, article.text, date_bm_added),
-    )
-    conn.commit()
-    return "+"
 
 
 @click.group()
@@ -53,23 +17,24 @@ def cli():
 
 @click.command("index")
 @click.option("-v", "--verbose", is_flag=True, help="Enables verbose mode")
-def do_index(verbose):
-    bm_db = appdata.get_places_db()
-    if bm_db:
-        temp_path = appdata.create_temporary_copy(bm_db)
+def action_index(verbose):
+    places_dbs = appdata.get_places_dbs()
+    if places_dbs:
+        # TODO remove default
+        config = appdata.load_config()
+        try:
+            places_db = config['DEFAULT']['places_db']
+        except KeyError:
+            places_db = None
 
-        with db.connect(temp_path) as places:
-            with closing(places.cursor()) as ff_cursor:
-                ff_cursor = appdata.select_bookmarks(ff_cursor)
+        if not places_db:
+            choice = input.let_user_pick(places_dbs)
+            places_db = places_dbs[choice - 1]
+            appdata.save_config('places_db', places_db)
 
-                data_path = appdata.data_path()
-                with db.connect(data_path) as fafi:
-                    db.create_table(fafi)
+        print('Places:', places_db)
 
-                    for row in ff_cursor:
-                        o = index_site(fafi, row, verbose)
-                        if o == "=":
-                            continue
+        app.index_with_db(places_db, verbose)
 
 
 @click.command("search")
@@ -77,7 +42,7 @@ def do_index(verbose):
 @click.option(
     "--max-results", default=7, show_default=True, help="Return <int> results",
 )
-def do_search(keywords, max_results):
+def action_search(keywords, max_results):
     print("Searching for:", keywords)
     data_path = appdata.data_path()
     if os.path.exists(data_path):
@@ -95,8 +60,8 @@ def do_search(keywords, max_results):
                 i += 1
 
 
-cli.add_command(do_index)
-cli.add_command(do_search)
+cli.add_command(action_index)
+cli.add_command(action_search)
 
 if __name__ == "__main__":
     cli()
