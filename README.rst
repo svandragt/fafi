@@ -7,7 +7,7 @@ Search Firefox bookmark contents, with this commandline client. Fafi extracts th
 Things it does:
 
 
-* Detects your places database from the Firefox profile folder.
+* Detects your places database from the Firefox profile folder. (support for picking a profile from multiple profiles)
 * Extract main text content from all bookmarks into ``<user_data_dir>/fafi/data.sqlite``.
 * Skips .local and .test domains.
 * Skips pages that are already indexed.
