@@ -1,4 +1,5 @@
 import appdirs
+import configparser
 import datetime
 import os
 import shutil
@@ -7,13 +8,13 @@ import tempfile
 # fafi
 import db
 
+config = None
 
 def get_firefox_path():
     return appdirs.user_data_dir("Firefox")
 
 
 def get_places_dbs():
-
     # set the path of firefox folder with databases
     ff_path = get_firefox_path()
 
@@ -29,13 +30,17 @@ def get_places_dbs():
 
 
 def data_path(silent=False):
+    sqlite_path = get_data_dir() + "/data.sqlite"
+    if not silent:
+        print("Store: " + sqlite_path)
+    return sqlite_path
+
+
+def get_data_dir():
     data_dir = appdirs.user_data_dir("fafi")
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
-    sqlite_path = data_dir + "/data.sqlite"
-    if not silent:
-        print("Using: " + sqlite_path)
-    return sqlite_path
+    return data_dir
 
 
 # get bookmarks from firefox sqlite database file and print all
@@ -72,3 +77,27 @@ def get_last_row_bm_date():
         db.create_table(fafi)
 
         return db.last_row_bm_date(fafi)
+
+
+def get_config_path():
+    return get_data_dir() + "/config.ini"
+
+
+def load_config():
+    global config
+
+    if not config:
+        config = configparser.ConfigParser()
+        config.read(get_config_path())
+
+    return config
+
+
+def save_config(name, value):
+    global config
+    config = load_config()
+
+    config['DEFAULT'][name] = value
+
+    with open(get_config_path(), 'w') as configfile:  # save
+        config.write(configfile)

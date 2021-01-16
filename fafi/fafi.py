@@ -6,7 +6,7 @@ import os
 # fafi
 import appdata
 import app
-import cli
+import input
 import db
 
 
@@ -18,10 +18,23 @@ def cli():
 @click.command("index")
 @click.option("-v", "--verbose", is_flag=True, help="Enables verbose mode")
 def action_index(verbose):
-    bm_dbs = appdata.get_places_dbs()
-    if bm_dbs:
-        i = cli.let_user_pick(bm_dbs)
-        app.index_with_db(bm_dbs[i - 1], verbose)
+    places_dbs = appdata.get_places_dbs()
+    if places_dbs:
+        # TODO remove default
+        config = appdata.load_config()
+        try:
+            places_db = config['DEFAULT']['places_db']
+        except KeyError:
+            places_db = None
+
+        if not places_db:
+            choice = input.let_user_pick(places_dbs)
+            places_db = places_dbs[choice - 1]
+            appdata.save_config('places_db', places_db)
+
+        print('Places:', places_db)
+
+        app.index_with_db(places_db, verbose)
 
 
 @click.command("search")
