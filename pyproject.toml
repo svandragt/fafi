@@ -1,13 +1,13 @@
 [tool.poetry]
 name = "fafi"
-version = "0.1.5"
+version = "0.2.0"
 description = "CLI for indexing Firefox bookmarks."
 authors = ["Sander van Dragt <sander@vandragt.com>"]
 license = "MIT"
 readme = "README.rst"
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.8"
 newspaper3k = "^0.2.8"
 click = "^7.1.1"
 appdirs = "^1.4.3"
@@ -15,13 +15,10 @@ appdirs = "^1.4.3"
 [tool.poetry.dev-dependencies]
 black = "^19.10b0"
 pylint = "^2.6.0"
-pyinstaller = "^4.2"
-macholib = "^1.14"
 
 [tool.poetry.scripts]
 fafi = 'fafi.fafi:cli'
 
 [build-system]
-requires = ["poetry>=0.12"]
+requires = ["poetry>=1.0.9"]
 build-backend = "poetry.masonry.api"
-
