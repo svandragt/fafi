@@ -13,7 +13,7 @@ click = "^7.1.1"
 appdirs = "^1.4.3"
 
 [tool.poetry.dev-dependencies]
-black = "^21.4b2"
+black = "^21.5b1"
 pylint = "^2.8.2"
 
 [tool.poetry.scripts]
