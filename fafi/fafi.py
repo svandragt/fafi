@@ -27,6 +27,10 @@ def action_index(verbose):
         except KeyError:
             places_db = None
 
+        # Handle profile deletion
+        if not os.path.exists(places_db):
+            places_db = None
+
         if not places_db:
             choice = input.let_user_pick(places_dbs)
             places_db = places_dbs[choice - 1]
