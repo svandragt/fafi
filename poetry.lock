@@ -8,7 +8,7 @@ python-versions = "*"
 
 [[package]]
 name = "astroid"
-version = "2.5.6"
+version = "2.6.2"
 description = "An abstract syntax tree for Python with inference support."
 category = "dev"
 optional = false
@@ -30,8 +30,8 @@ python-versions = "*"
 soupsieve = {version = ">1.2", markers = "python_version >= \"3.0\""}
 
 [package.extras]
-lxml = ["lxml"]
 html5lib = ["html5lib"]
+lxml = ["lxml"]
 
 [[package]]
 name = "black"
@@ -42,18 +42,18 @@ optional = false
 python-versions = ">=3.6.2"
 
 [package.dependencies]
-regex = ">=2020.1.8"
-mypy-extensions = ">=0.4.3"
-toml = ">=0.10.1"
-pathspec = ">=0.8.1,<1"
-click = ">=7.1.2"
 appdirs = "*"
+click = ">=7.1.2"
+mypy-extensions = ">=0.4.3"
+pathspec = ">=0.8.1,<1"
+regex = ">=2020.1.8"
+toml = ">=0.10.1"
 
 [package.extras]
-python2 = ["typed-ast (>=1.4.2)"]
 colorama = ["colorama (>=0.4.3)"]
-uvloop = ["uvloop (>=0.15.2)"]
 d = ["aiohttp (>=3.6.0)", "aiohttp-cors (>=0.4.0)"]
+python2 = ["typed-ast (>=1.4.2)"]
+uvloop = ["uvloop (>=0.15.2)"]
 
 [[package]]
 name = "certifi"
@@ -105,8 +105,8 @@ python-versions = "*"
 
 [package.dependencies]
 beautifulsoup4 = "*"
-six = "*"
 requests = "*"
+six = "*"
 
 [[package]]
 name = "feedparser"
@@ -144,9 +144,9 @@ optional = false
 python-versions = ">=3.6,<4.0"
 
 [package.extras]
-colors = ["colorama (>=0.4.3,<0.5.0)"]
 pipfile_deprecated_finder = ["pipreqs", "requirementslib"]
 requirements_deprecated_finder = ["pipreqs", "pip-api"]
+colors = ["colorama (>=0.4.3,<0.5.0)"]
 
 [[package]]
 name = "jieba3k"
@@ -181,10 +181,10 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, != 3.4.*"
 
 [package.extras]
-source = ["Cython (>=0.29.7)"]
 cssselect = ["cssselect (>=0.7)"]
 html5 = ["html5lib"]
 htmlsoup = ["beautifulsoup4"]
+source = ["Cython (>=0.29.7)"]
 
 [[package]]
 name = "mccabe"
@@ -211,19 +211,19 @@ optional = false
 python-versions = "*"
 
 [package.dependencies]
-PyYAML = ">=3.11"
-lxml = ">=3.6.0"
-tinysegmenter = "0.3"
-Pillow = ">=3.3.0"
-nltk = ">=3.2.1"
-feedparser = ">=5.2.1"
-cssselect = ">=0.9.2"
-tldextract = ">=2.0.1"
-python-dateutil = ">=2.5.3"
-requests = ">=2.10.0"
 beautifulsoup4 = ">=4.4.1"
+cssselect = ">=0.9.2"
 feedfinder2 = ">=0.0.4"
+feedparser = ">=5.2.1"
 jieba3k = ">=0.35.1"
+lxml = ">=3.6.0"
+nltk = ">=3.2.1"
+Pillow = ">=3.3.0"
+python-dateutil = ">=2.5.3"
+PyYAML = ">=3.11"
+requests = ">=2.10.0"
+tinysegmenter = "0.3"
+tldextract = ">=2.0.1"
 
 [[package]]
 name = "nltk"
@@ -234,18 +234,18 @@ optional = false
 python-versions = ">=3.5.*"
 
 [package.dependencies]
+click = "*"
 joblib = "*"
 regex = "*"
 tqdm = "*"
-click = "*"
 
 [package.extras]
-plot = ["matplotlib"]
 all = ["matplotlib", "twython", "scipy", "numpy", "gensim (<4.0.0)", "python-crfsuite", "pyparsing", "scikit-learn", "requests"]
-twitter = ["twython"]
-tgrep = ["pyparsing"]
-machine_learning = ["gensim (<4.0.0)", "numpy", "python-crfsuite", "scikit-learn", "scipy"]
 corenlp = ["requests"]
+machine_learning = ["gensim (<4.0.0)", "numpy", "python-crfsuite", "scikit-learn", "scipy"]
+plot = ["matplotlib"]
+tgrep = ["pyparsing"]
+twitter = ["twython"]
 
 [[package]]
 name = "pathspec"
@@ -265,18 +265,18 @@ python-versions = ">=3.6"
 
 [[package]]
 name = "pylint"
-version = "2.8.3"
+version = "2.9.3"
 description = "python code static checker"
 category = "dev"
 optional = false
 python-versions = "~=3.6"
 
 [package.dependencies]
-astroid = "2.5.6"
-mccabe = ">=0.6,<0.7"
+astroid = ">=2.6.2,<2.7"
 colorama = {version = "*", markers = "sys_platform == \"win32\""}
-toml = ">=0.7.1"
 isort = ">=4.2.5,<6"
+mccabe = ">=0.6,<0.7"
+toml = ">=0.7.1"
 
 [[package]]
 name = "python-dateutil"
@@ -314,9 +314,9 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 
 [package.dependencies]
-idna = ">=2.5,<3"
 certifi = ">=2017.4.17"
 chardet = ">=3.0.2,<5"
+idna = ">=2.5,<3"
 urllib3 = ">=1.21.1,<1.27"
 
 [package.extras]
@@ -376,10 +376,10 @@ optional = false
 python-versions = ">=3.5"
 
 [package.dependencies]
-requests-file = ">=1.4"
-requests = ">=2.1.0"
 filelock = ">=3.0.8"
 idna = "*"
+requests = ">=2.1.0"
+requests-file = ">=1.4"
 
 [[package]]
 name = "toml"
@@ -398,9 +398,9 @@ optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7"
 
 [package.extras]
-telegram = ["requests"]
-notebook = ["ipywidgets (>=6)"]
 dev = ["py-make (>=0.1.0)", "twine", "wheel"]
+notebook = ["ipywidgets (>=6)"]
+telegram = ["requests"]
 
 [[package]]
 name = "urllib3"
@@ -426,7 +426,7 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "71a57145d7ed3876618d8232321fd4abbbba653941b4ff8086a14d7f246c3a3d"
+content-hash = "f970405223bdc3d0c9ee4cc052261eef1de8ec469e6cf449b3b8b907e67b0c69"
 
 [metadata.files]
 appdirs = [
@@ -434,8 +434,8 @@ appdirs = [
     {file = "appdirs-1.4.4.tar.gz", hash = "sha256:7d5d0167b2b1ba821647616af46a749d1c653740dd0d2415100fe26e27afdf41"},
 ]
 astroid = [
-    {file = "astroid-2.5.6-py3-none-any.whl", hash = "sha256:4db03ab5fc3340cf619dbc25e42c2cc3755154ce6009469766d7143d1fc2ee4e"},
-    {file = "astroid-2.5.6.tar.gz", hash = "sha256:8a398dfce302c13f14bab13e2b14fe385d32b73f4e4853b9bdfb64598baa1975"},
+    {file = "astroid-2.6.2-py3-none-any.whl", hash = "sha256:606b2911d10c3dcf35e58d2ee5c97360e8477d7b9f3efc3f24811c93e6fc2cd9"},
+    {file = "astroid-2.6.2.tar.gz", hash = "sha256:38b95085e9d92e2ca06cf8b35c12a74fa81da395a6f9e65803742e6509c05892"},
 ]
 beautifulsoup4 = [
     {file = "beautifulsoup4-4.9.3-py2-none-any.whl", hash = "sha256:4c98143716ef1cb40bf7f39a8e3eec8f8b009509e74904ba3a7b315431577e35"},
@@ -621,8 +621,8 @@ pillow = [
     {file = "Pillow-8.2.0.tar.gz", hash = "sha256:a787ab10d7bb5494e5f76536ac460741788f1fbce851068d73a87ca7c35fc3e1"},
 ]
 pylint = [
-    {file = "pylint-2.8.3-py3-none-any.whl", hash = "sha256:792b38ff30903884e4a9eab814ee3523731abd3c463f3ba48d7b627e87013484"},
-    {file = "pylint-2.8.3.tar.gz", hash = "sha256:0a049c5d47b629d9070c3932d13bff482b12119b6a241a93bc460b0be16953c8"},
+    {file = "pylint-2.9.3-py3-none-any.whl", hash = "sha256:5d46330e6b8886c31b5e3aba5ff48c10f4aa5e76cbf9002c6544306221e63fbc"},
+    {file = "pylint-2.9.3.tar.gz", hash = "sha256:23a1dc8b30459d78e9ff25942c61bb936108ccbe29dd9e71c01dc8274961709a"},
 ]
 python-dateutil = [
     {file = "python-dateutil-2.8.1.tar.gz", hash = "sha256:73ebfe9dbf22e832286dafa60473e4cd239f8592f699aa5adaf10050e6e1823c"},
