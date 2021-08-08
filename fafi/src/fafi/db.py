@@ -1,5 +1,7 @@
 import sqlite3
 
+from . import data
+
 
 def connect(db_file):
     """ create a database connection to the SQLite database
@@ -75,3 +77,11 @@ def last_row_bm_date(conn):
 
     for row in cursor:
         return row[0]
+
+
+def get_last_row_bm_date():
+    sqlite_path = data.data_path(silent=True)
+    with connect(sqlite_path) as fafi:
+        create_table(fafi)
+
+        return last_row_bm_date(fafi)
