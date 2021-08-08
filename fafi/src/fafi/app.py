@@ -20,10 +20,6 @@ class Fafi(toga.App):
             return
         actions.action_search(self.inputbox.value, 7)
 
-    def OnInputboxLoseFocus(self,sender):
-        self.inputbox.refresh()
-        print('lost focus')
-
     def startup(self):
         """
         Construct and show the Toga application.
@@ -33,38 +29,35 @@ class Fafi(toga.App):
         show the main window.
         """
         box = toga.Box(style=Pack(direction=COLUMN))
-        self.inputbox = toga.TextInput(id='inputbox')
+        self.inputbox = toga.TextInput(id='inputbox', placeholder='Keywords')
         self.inputbox.style.flex = 1
+        self.inputbox.style.padding_bottom = 10
         self.inputbox.on_change = self.OnInputboxChange
-        self.inputbox.on_lose_focus = self.OnInputboxLoseFocus
         box.add(self.inputbox)
 
         self.logbox = toga.MultilineTextInput(id='logbox',readonly=True )
         self.logbox.style.flex = 1
-        self.logbox.style.padding_top = 50
         box.add(self.logbox)
-
-        run_group = toga.Group('Run', order=40)
 
         cmd_index = toga.Command(
             commands.cmd_index,
             label='Index bookmarks',
-            tooltip='Tells you when it has been activated',
-            shortcut='i',
+            tooltip='Index new bookmarks',
+            shortcut=toga.Key.MOD_1 + 'i',
             icon='icons/pretty.png',
-            group=run_group,
+            group=toga.Group.COMMANDS,
         )
         self.commands.add(cmd_index)
 
-        cmd_test = toga.Command(
-            commands.cmd_test,
-            label='Set logBox',
-            tooltip='Tells you when it has been activated',
-            shortcut='t',
+        cmd_focus = toga.Command(
+            commands.cmd_focus,
+            label='Focus search',
+            tooltip='Focus the search bar',
+            shortcut=toga.Key.MOD_1 + 'l',
             icon='icons/pretty.png',
-            group=run_group,
+            group=toga.Group.COMMANDS,
         )
-        self.commands.add(cmd_test)
+        self.commands.add(cmd_focus)
 
         self.main_window = toga.MainWindow(title=self.formal_name)
         self.main_window.content = box

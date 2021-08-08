@@ -4,13 +4,8 @@ from contextlib import closing
 from . import utility, firefox, configuration, app, index, db, data
 
 
-def cmd_search(sender):
-    print('search command')
-
-
-def cmd_test(sender):
-    app.me.SetLog('bla')
-
+def cmd_focus(sender):
+    app.me.inputbox.focus()
 
 def cmd_index(sender):
     print('index command')
