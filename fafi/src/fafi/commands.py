@@ -4,6 +4,14 @@ from contextlib import closing
 from . import utility, firefox, configuration, app, index, db, data
 
 
+def cmd_search(sender):
+    print('search command')
+
+
+def cmd_test(sender):
+    app.me.SetLog('bla')
+
+
 def cmd_index(sender):
     print('index command')
     places_dbs = firefox.get_places_dbs()

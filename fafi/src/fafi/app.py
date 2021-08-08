@@ -15,9 +15,14 @@ class Fafi(toga.App):
         self.logbox.refresh()
 
     def OnInputboxChange(self, sender):
+        self.inputbox.refresh()
         if len(self.inputbox.value) < 3:
             return
         actions.action_search(self.inputbox.value, 7)
+
+    def OnInputboxLoseFocus(self,sender):
+        self.inputbox.refresh()
+        print('lost focus')
 
     def startup(self):
         """
@@ -28,28 +33,16 @@ class Fafi(toga.App):
         show the main window.
         """
         box = toga.Box(style=Pack(direction=COLUMN))
+        self.inputbox = toga.TextInput(id='inputbox')
+        self.inputbox.style.flex = 1
+        self.inputbox.on_change = self.OnInputboxChange
+        self.inputbox.on_lose_focus = self.OnInputboxLoseFocus
+        box.add(self.inputbox)
 
-        inputbox = toga.TextInput(id='inputbox')
-        inputbox.style.flex = 1
-        inputbox.style.padding_bottom = 10
-        inputbox.on_change = self.OnInputboxChange
-        self.inputbox = inputbox
-
-        box.add(inputbox)
-
-        container = toga.OptionContainer()
-
-        self.resultsbox = toga.Table(['Link', 'Match'])
-        container.add('Results',self.resultsbox)
-
-        logbox = toga.MultilineTextInput(id='logbox', readonly=True)
-        logbox.style.flex = 1
-        logbox.style.padding_top = 50
-        self.logbox = logbox
-        container.add('Logs', self.logbox)
-
-        self.container = container
-        box.add(container)
+        self.logbox = toga.MultilineTextInput(id='logbox',readonly=True )
+        self.logbox.style.flex = 1
+        self.logbox.style.padding_top = 50
+        box.add(self.logbox)
 
         run_group = toga.Group('Run', order=40)
 
@@ -57,11 +50,21 @@ class Fafi(toga.App):
             commands.cmd_index,
             label='Index bookmarks',
             tooltip='Tells you when it has been activated',
-            shortcut=toga.Key.MOD_1+'i',
+            shortcut='i',
             icon='icons/pretty.png',
             group=run_group,
         )
         self.commands.add(cmd_index)
+
+        cmd_test = toga.Command(
+            commands.cmd_test,
+            label='Set logBox',
+            tooltip='Tells you when it has been activated',
+            shortcut='t',
+            icon='icons/pretty.png',
+            group=run_group,
+        )
+        self.commands.add(cmd_test)
 
         self.main_window = toga.MainWindow(title=self.formal_name)
         self.main_window.content = box
