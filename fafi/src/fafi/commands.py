@@ -1,12 +1,16 @@
 import os
+from contextlib import closing
 
-from . import actions, utility, firefox, configuration, app
+from . import utility, firefox, configuration, app, index, db, data
+
 
 def cmd_search(sender):
     print('search command')
 
+
 def cmd_test(sender):
     app.me.SetLog('bla')
+
 
 def cmd_index(sender):
     print('index command')
@@ -30,4 +34,23 @@ def cmd_index(sender):
 
         print('Places:', places_db)
 
-        actions.action_index_with_db(places_db)
+        temp_path = utility.create_temporary_copy(places_db)
+        with db.connect(temp_path) as places:
+            with closing(places.cursor()) as ff_cursor:
+                ff_cursor = firefox.select_bookmarks(ff_cursor)
+
+                data_path = data.data_path()
+                with db.connect(data_path) as fafi:
+                    db.create_table(fafi)
+
+                    o = None
+
+                    for row in ff_cursor:
+                        o = index.index_site(fafi, row)
+                        if o == "=":
+                            continue
+                        yield
+
+                    if not o:
+                        print('\nNothing to index.')
+                        app.me.AddLogLine('Nothing to index.')

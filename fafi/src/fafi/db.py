@@ -57,8 +57,6 @@ def search(conn, keywords, max_results):
         """,
         (keywords, max_results),
     )
-    if cursor.rowcount == 0:
-        return None
     return cursor
 
 

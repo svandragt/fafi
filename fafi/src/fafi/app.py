@@ -5,16 +5,12 @@ import toga
 from toga.style import Pack
 from travertino.constants import COLUMN
 
-from . import commands
+from . import commands, actions
 
 me = None
 
 class Fafi(toga.App):
-    def AddLogLine(self, *args):
-        text = ''
-        if type(args) is tuple:
-            print(args)
-            text = ' '.join(args)
+    def AddLogLine(self, text):
         self.logbox.value += text
         self.logbox.refresh()
 
@@ -22,7 +18,7 @@ class Fafi(toga.App):
         self.inputbox.refresh()
         if len(self.inputbox.value) < 3:
             return
-        commands.actions.action_search(self.inputbox.value, 7)
+        actions.action_search(self.inputbox.value, 7)
 
     def OnInputboxLoseFocus(self,sender):
         self.inputbox.refresh()
