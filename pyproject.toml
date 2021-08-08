@@ -1,16 +1,14 @@
 [tool.poetry]
 name = "fafi"
 version = "0.2.0"
-description = "CLI for indexing Firefox bookmarks."
+description = "Local bookmark manager."
 authors = ["Sander van Dragt <sander@vandragt.com>"]
 license = "MIT"
 readme = "README.rst"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-newspaper3k = "^0.2.8"
-click = "^7.1.1"
-appdirs = "^1.4.3"
+briefcase = "^0.3.5"
 
 [tool.poetry.dev-dependencies]
 black = "^21.4b2"

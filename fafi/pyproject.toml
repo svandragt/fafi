@@ -1,0 +1,53 @@
+[tool.briefcase]
+project_name = "Fafi"
+bundle = "com.vandragt.fafi"
+version = "0.0.1"
+url = "https://vandragt.com/fafi"
+license = "MIT license"
+author = 'Sander van Dragt'
+author_email = "sander@vandragt.com"
+
+[tool.briefcase.app.fafi]
+formal_name = "Fafi"
+description = "Local bookmark manager"
+icon = "src/fafi/resources/fafi"
+sources = ['src/fafi']
+requires = [
+    "newspaper3k>=0.2.8",
+    "click>=7.1.1",
+    "appdirs>=1.4.3"
+]
+
+
+[tool.briefcase.app.fafi.macOS]
+requires = [
+    'toga-cocoa>=0.3.0.dev20',
+]
+
+[tool.briefcase.app.fafi.linux]
+requires = [
+    'toga-gtk>=0.3.0.dev20',
+]
+system_requires = [
+    'libgirepository1.0-dev',
+    'libcairo2-dev',
+    'libpango1.0-dev',
+    'libwebkitgtk-3.0-0',
+    'gir1.2-webkit-3.0',
+]
+
+[tool.briefcase.app.fafi.windows]
+requires = [
+    'toga-winforms>=0.3.0.dev20',
+]
+
+# Mobile deployments
+[tool.briefcase.app.fafi.iOS]
+requires = [
+    'toga-iOS>=0.3.0.dev20',
+]
+
+[tool.briefcase.app.fafi.android]
+requires = [
+    'toga-android>=0.3.0.dev20',
+]
