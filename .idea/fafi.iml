@@ -7,6 +7,42 @@
       <excludeFolder url="file://$MODULE_DIR$/cli/fafi.egg-info" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/fafi/src/fafi.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app/fafi-0.0.1.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/appdirs-1.4.4.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/beautifulsoup4-4.9.3.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/certifi-2021.5.30.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/charset_normalizer-2.0.4.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/click-8.0.1.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/cssselect-1.1.0.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/feedfinder2-0.0.4.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/feedparser-6.0.8.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/filelock-3.0.12.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/idna-3.2.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/jieba3k-0.35.1.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/joblib-1.0.1.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/lxml-4.6.3.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/newspaper3k-0.2.8.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/nltk-3.6.2.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/Pillow-8.3.1.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/python_dateutil-2.8.2.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/PyYAML-5.4.1.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/regex-2021.8.3.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/requests-2.26.0.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/requests_file-1.5.1.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/rubicon_objc-0.4.1.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/sgmllib3k-1.0.0.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/six-1.16.0.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/soupsieve-2.2.1.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/tinysegmenter-0.3.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/tldextract-3.1.0.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/toga_cocoa-0.3.0.dev28.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/toga_core-0.3.0.dev28.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/tqdm-4.62.0.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/travertino-0.1.3.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi/Fafi.app/Contents/Resources/app_packages/urllib3-1.26.6.dist-info" />
+      <excludeFolder url="file://$MODULE_DIR$/fafi/macOS/app/Fafi" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.9 (fafi)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

@@ -1,11 +1,12 @@
 import os
 
-from . import actions, utility, firefox, configuration
-
+from . import actions, utility, firefox, configuration, app
 
 def cmd_search(sender):
     print('search command')
 
+def cmd_test(sender):
+    app.me.SetLog('bla')
 
 def cmd_index(sender):
     print('index command')

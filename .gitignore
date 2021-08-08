@@ -1,2 +1,4 @@
 *.dist-info/
 *.egg-info/
+*.app
+/fafi/macOS/app/Fafi/
