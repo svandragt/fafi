@@ -12,7 +12,7 @@ briefcase = "^0.3.5"
 
 [tool.poetry.dev-dependencies]
 black = "^21.4b2"
-pylint = "^2.8.2"
+pylint = "^2.10.2"
 
 [tool.poetry.scripts]
 fafi = 'fafi.fafi:cli'
