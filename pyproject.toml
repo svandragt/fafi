@@ -9,7 +9,7 @@ readme = "README.rst"
 [tool.poetry.dependencies]
 python = "^3.8"
 newspaper3k = "^0.2.8"
-click = "^7.1.1"
+click = "^8.0.3"
 appdirs = "^1.4.3"
 
 [tool.poetry.dev-dependencies]
