@@ -14,7 +14,7 @@ appdirs = "^1.4.3"
 
 [tool.poetry.dev-dependencies]
 black = "^21.4b2"
-pylint = "^2.8.2"
+pylint = "^2.12.1"
 
 [tool.poetry.scripts]
 fafi = 'fafi.fafi:cli'
