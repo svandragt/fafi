@@ -7,10 +7,10 @@ license = "MIT"
 readme = "README.rst"
 
 [tool.poetry.dependencies]
-python = "^3.8"
-newspaper3k = "^0.2.8"
-click = "^8.0.3"
-appdirs = "^1.4.3"
+python = "^3.7"
+newspaper3k = "^0.2"
+click = "^8.0"
+appdirs = "^1.4"
 
 [tool.poetry.dev-dependencies]
 black = "^21.4b2"
