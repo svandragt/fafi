@@ -10,7 +10,7 @@ def index_site(conn, row, verbose):
     url = row[0]
     date_bm_added = row[2]
     d = datetime.datetime.fromtimestamp(date_bm_added / 1000000)
-    if any(x in url for x in [".local", ".test"]):
+    if any(x in url for x in [".local", ".test", "localhost"]):
         print("\nS", url)
         return
 
