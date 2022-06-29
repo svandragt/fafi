@@ -36,9 +36,6 @@ Developers
    # Log in to a python shell
    poetry shell
 
-   # Make faff executable
-   chmod +x fafi.py
-
    # Help on commands
    ./fafi.py --help
    
