@@ -1,9 +1,17 @@
-build() {
+build-app() {
     rm -rf dist/zip
-    poetry export -o requirements.txt --without-hashes
-    pex . -r requirements.txt -o dist/fafi.pex -e fafi.main:main
-    pushd dist || exit
-        unzip fafi.pex -d zip
-        ./fafi.pex --help
+    poetry run fafi --help && \
+    poetry export -o requirements.txt --without-hashes && \
+    pex . -r requirements.txt -o dist/fafi.pex -e fafi.main:main && \
+    pushd dist || exit && \
+        unzip fafi.pex -d zip && \
+        ./fafi.pex --help && \
     popd || exit
+}
+
+publish-pypi() {
+    echo "Review pyproject.toml and src/fafi/__init__.py versions numbers"
+    read -p "Press [Enter] key to start publishing..."
+    poetry build && \
+    poetry publish
 }
