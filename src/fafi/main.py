@@ -4,10 +4,10 @@ import click
 import os
 
 # fafi
-from src.fafi import app
-from src.fafi import input
-from src.fafi import db
-from src.fafi import appdata
+from . import core
+from . import input
+from . import db
+from . import appdata
 
 
 @click.group()
@@ -38,7 +38,7 @@ def action_index(verbose):
 
         print('Places:', places_db)
 
-        app.index_with_db(places_db, verbose)
+        core.index_with_db(places_db, verbose)
 
 
 @click.command("search")

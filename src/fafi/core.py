@@ -1,8 +1,8 @@
 from contextlib import closing
 
-from src.fafi import appdata
+from . import appdata
 import datetime
-from src.fafi import db
+from . import db
 import newspaper
 
 
