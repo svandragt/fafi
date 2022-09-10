@@ -4,14 +4,14 @@ import click
 import os
 
 # fafi
-import appdata
-import app
-import input
-import db
+from src.fafi import app
+from src.fafi import input
+from src.fafi import db
+from src.fafi import appdata
 
 
 @click.group()
-def cli():
+def main():
     pass
 
 
@@ -64,8 +64,8 @@ def action_search(keywords, max_results):
                 i += 1
 
 
-cli.add_command(action_index)
-cli.add_command(action_search)
+main.add_command(action_index)
+main.add_command(action_search)
 
 if __name__ == "__main__":
-    cli()
+    main()
