@@ -6,7 +6,7 @@ import shutil
 import tempfile
 
 # fafi
-import db
+from . import db
 
 config = None
 

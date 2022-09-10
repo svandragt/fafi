@@ -1,0 +1,9 @@
+build() {
+    rm -rf dist/zip
+    poetry export -o requirements.txt --without-hashes
+    pex . -r requirements.txt -o dist/fafi.pex -e fafi.main:main
+    pushd dist || exit
+        unzip fafi.pex -d zip
+        ./fafi.pex --help
+    popd || exit
+}

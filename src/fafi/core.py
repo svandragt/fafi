@@ -1,8 +1,8 @@
 from contextlib import closing
 
-import appdata
+from . import appdata
 import datetime
-import db
+from . import db
 import newspaper
 
 

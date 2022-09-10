@@ -4,14 +4,14 @@ import click
 import os
 
 # fafi
-import appdata
-import app
-import input
-import db
+from . import core
+from . import input
+from . import db
+from . import appdata
 
 
 @click.group()
-def cli():
+def main():
     pass
 
 
@@ -38,7 +38,7 @@ def action_index(verbose):
 
         print('Places:', places_db)
 
-        app.index_with_db(places_db, verbose)
+        core.index_with_db(places_db, verbose)
 
 
 @click.command("search")
@@ -64,8 +64,8 @@ def action_search(keywords, max_results):
                 i += 1
 
 
-cli.add_command(action_index)
-cli.add_command(action_search)
+main.add_command(action_index)
+main.add_command(action_search)
 
 if __name__ == "__main__":
-    cli()
+    main()
