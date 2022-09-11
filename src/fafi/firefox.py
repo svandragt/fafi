@@ -45,13 +45,14 @@ def index():
             appdata.save_config('firefox_places_db', places_db)
 
         print('Places:', places_db)
-        index_with_db(places_db)
+        index_with_places(places_db)
     else:
         print('ERROR: Places database not found')
 
 
-def index_with_db(places_db):
+def index_with_places(places_db):
     temp_path = appdata.create_temporary_copy(places_db)
+
     with db.connect(temp_path) as places:
         with closing(places.cursor()) as ff_cursor:
             ff_cursor = select_bookmarks(ff_cursor)
@@ -60,6 +61,8 @@ def index_with_db(places_db):
                 core.index_site(url=row[0], date_bm_added=row[2])
             else:
                 print('\nNew bookmarks not found.')
+
+    os.remove(temp_path)
 
 
 def select_bookmarks(cursor):
