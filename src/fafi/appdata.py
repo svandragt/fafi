@@ -60,5 +60,9 @@ def save_config(name, value):
 
     config['DEFAULT'][name] = value
 
+    # Handle option migration
+    if value is None:
+        config.remove_option('DEFAULT', name)
+
     with open(get_config_path(), 'w') as configfile:  # save
         config.write(configfile)

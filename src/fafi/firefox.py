@@ -33,7 +33,11 @@ def index():
         try:
             places_db = config['DEFAULT']['firefox_places_db']
         except KeyError:
-            places_db = None
+            try:
+                places_db = config['DEFAULT']['places_db']
+                appdata.save_config('places_db', None)
+            except KeyError:
+                places_db = None
 
         # Handle profile deletion
         if not os.path.exists(places_db):
