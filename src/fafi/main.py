@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
-import click
 import os
 
+import click
+
 # fafi
-from . import core
-from . import input
-from . import db
 from . import appdata
+from . import db
+from . import firefox
 
 
 @click.group()
@@ -16,29 +16,11 @@ def main():
 
 
 @click.command("index")
-@click.option("-v", "--verbose", is_flag=True, help="Enables verbose mode")
-def action_index(verbose):
-    places_dbs = appdata.get_places_dbs()
-    if places_dbs:
-        # TODO remove default
-        config = appdata.load_config()
-        try:
-            places_db = config['DEFAULT']['places_db']
-        except KeyError:
-            places_db = None
+def action_index():
+    with db.connect(appdata.data_path()) as fafi:
+        db.create_table(fafi)
 
-        # Handle profile deletion
-        if not os.path.exists(places_db):
-            places_db = None
-
-        if not places_db:
-            choice = input.let_user_pick(places_dbs)
-            places_db = places_dbs[choice - 1]
-            appdata.save_config('places_db', places_db)
-
-        print('Places:', places_db)
-
-        core.index_with_db(places_db, verbose)
+    firefox.index()
 
 
 @click.command("search")
