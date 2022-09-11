@@ -60,7 +60,7 @@ def index_with_places(places_db):
             for row in ff_cursor:
                 core.index_site(url=row[0], date_bm_added=row[2])
             else:
-                print('\nNew bookmarks not found.')
+                print('\nAll bookmarks are indexed.')
 
     os.remove(temp_path)
 
