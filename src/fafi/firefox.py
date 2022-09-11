@@ -7,13 +7,13 @@ import appdirs
 from . import appdata, db, core, input
 
 
-def get_application_data_path():
+def _get_application_data_path():
     return appdirs.user_data_dir("Firefox")
 
 
-def get_places_dbs():
+def _get_places_dbs():
     # set the path of firefox folder with databases
-    ff_path = get_application_data_path()
+    ff_path = _get_application_data_path()
 
     # recursively walk tha path
     db_paths = []
@@ -27,7 +27,7 @@ def get_places_dbs():
 
 
 def index():
-    places_dbs = get_places_dbs()
+    places_dbs = _get_places_dbs()
     if places_dbs:
         config = appdata.load_config()
         try:
@@ -49,17 +49,17 @@ def index():
             appdata.save_config('firefox_places_db', places_db)
 
         print('Places:', places_db)
-        index_with_places(places_db)
+        _index_with_places(places_db)
     else:
         print('ERROR: Places database not found')
 
 
-def index_with_places(places_db):
+def _index_with_places(places_db):
     temp_path = appdata.create_temporary_copy(places_db)
 
     with db.connect(temp_path) as places:
         with closing(places.cursor()) as ff_cursor:
-            ff_cursor = select_bookmarks(ff_cursor)
+            ff_cursor = _select_bookmarks(ff_cursor)
 
             for row in ff_cursor:
                 core.index_site(url=row[0], date_bm_added=row[2])
@@ -69,7 +69,7 @@ def index_with_places(places_db):
     os.remove(temp_path)
 
 
-def select_bookmarks(cursor):
+def _select_bookmarks(cursor):
     # get bookmarks from firefox sqlite database file and print all
     bookmarks_query = """
     SELECT DISTINCT

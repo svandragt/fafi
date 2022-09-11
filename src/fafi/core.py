@@ -6,7 +6,7 @@ from . import appdata, db
 
 
 def index_site(url, date_bm_added=None):
-    if is_ignored_url(url):
+    if _is_ignored_url(url):
         print("\nIGNORED", url)
         return
 
@@ -36,7 +36,7 @@ def index_site(url, date_bm_added=None):
         print("\n✓", url, "(", str(d), ")")
 
 
-def is_ignored_url(url):
+def _is_ignored_url(url):
     if any(x in url for x in [".local", ".test", "localhost"]):
         return True
     return False
