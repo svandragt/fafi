@@ -7,7 +7,7 @@ import click
 # fafi
 from . import appdata
 from . import db
-from . import firefox
+from . import firefox as app_firefox
 
 
 @click.group()
@@ -16,11 +16,12 @@ def main():
 
 
 @click.command("index")
-def action_index():
+@click.option("--firefox", required=False, is_flag=True)
+def action_index(firefox=None):
     with db.connect(appdata.data_path()) as fafi:
         db.create_table(fafi)
 
-    firefox.index()
+    app_firefox.index()
 
 
 @click.command("search")
