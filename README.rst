@@ -2,18 +2,18 @@
 Fafi
 ====
 
-Search Firefox bookmark contents, with this commandline client. Fafi extracts the content of the bookmarks and stores them into a searchable SQLite database.
+Fafi (short for Favorites Finder) is a commandline client to search indexed webpages. Fafi extracts the content of the webpage and stores them into a full-text search database.
 
 Things it does:
 
-
-* Detects your places database from the Firefox profile folder. (support for picking a profile from multiple profiles)
-* Extract main text content from all bookmarks into ``<user_data_dir>/fafi/data.sqlite``.
-* Skips .local and .test domains.
-* Skips pages that are already indexed.
+* Adding single urls.
+* Incrementally indexing the places database from the Firefox profile folder. (The browser bookmarks) It supports picking a profile from multiple profiles.
+* Extract main text content.
+* Skips .local, localhost and .test domains.
+* Deduplication
 * Search results are ranked by relevance and displayed with snippets.
 
-URLs are stored together with the main page context as determined by `Newspaper <https://github.com/codelucas/newspaper>`_.
+Content extraction courtesy of `Newspaper <https://github.com/codelucas/newspaper>`_.
 
 Users
 -----
@@ -22,7 +22,8 @@ Users
 
    pipx install fafi
    fafi --help
-   fafi index
+   fafi index --firefox
+   fafi index --url=https://mylink
    fafi search 'linux'
 
 Developers
@@ -33,17 +34,14 @@ Developers
    # Install project requirements.
    poetry install
 
-   # Log in to a python shell
-   poetry shell
-
-   # Help on commands
-   ./fafi.py --help
-   
+   # Help
+   poetry run fafi --help
+  
    # Index bookmarks
-   ./fafi.py index
+   poetry run fafi index
 
    # Search for linux
-   ./fafi.py search 'linux'
+   poetry run fafi search 'linux'
 
 
 .. image:: https://user-images.githubusercontent.com/594871/76201330-ffcba880-61ea-11ea-9fdd-cc32a90deecd.png
