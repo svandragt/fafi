@@ -6,6 +6,7 @@ build-app() {
     pushd dist || exit && \
         unzip fafi.pex -d zip && \
         ./fafi.pex --help && \
+        cp fafi.pex ~/bin/ && \
     popd || exit
 }
 
