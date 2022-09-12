@@ -8,21 +8,24 @@ import click
 from . import appdata
 from . import db
 from . import firefox as app_firefox
+from . import core
 
 
 @click.group()
 def main():
     pass
 
-
 @click.command("index")
-@click.option("--firefox", required=False, is_flag=True)
-def action_index(firefox=None):
-    with db.connect(appdata.data_path()) as fafi:
+@click.option("--firefox", required=False, is_flag=True, help="Import Firefox profile.")
+@click.option("--url", required=False, default=None, help="Import single URL.")
+def action_index(url, firefox):
+    with db.connect(appdata.data_path(silent=False)) as fafi:
         db.create_table(fafi)
 
-    app_firefox.index()
-
+    if firefox:
+        app_firefox.index()
+    if url:
+        core.index_site(url)
 
 @click.command("search")
 @click.argument("keywords")
@@ -31,7 +34,7 @@ def action_index(firefox=None):
 )
 def action_search(keywords, max_results):
     print("Searching for:", keywords)
-    data_path = appdata.data_path()
+    data_path = appdata.data_path(silent=False)
     if os.path.exists(data_path):
         with db.connect(data_path) as fafi:
             cursor = db.search(fafi, keywords, max_results)

@@ -1,4 +1,5 @@
 import datetime
+import time
 
 import newspaper
 
@@ -26,6 +27,10 @@ def index_site(url, date_bm_added=None):
         except newspaper.article.ArticleException:
             print("\nERROR", article.download_exception_msg, article.url)
             return
+
+        # Fallback to now
+        if date_bm_added is None:
+            date_bm_added = time.time()
 
         d = datetime.datetime.fromtimestamp(date_bm_added / 1000000)
         cursor.execute(

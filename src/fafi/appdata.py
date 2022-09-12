@@ -11,7 +11,7 @@ from . import db
 config = None
 
 
-def data_path(silent=False):
+def data_path(silent=True):
     sqlite_path = get_data_dir() + "/data.sqlite"
     if not silent:
         print("Store: " + sqlite_path)
@@ -33,7 +33,7 @@ def create_temporary_copy(path):
 
 
 def get_last_row_bm_date():
-    sqlite_path = data_path(silent=True)
+    sqlite_path = data_path()
     with db.connect(sqlite_path) as fafi:
         db.create_table(fafi)
 
