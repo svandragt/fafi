@@ -36,13 +36,7 @@ Developers
 
    # Help
    poetry run fafi --help
-  
-   # Index bookmarks
-   poetry run fafi index
-
-   # Search for linux
-   poetry run fafi search 'linux'
-
+ 
 
 .. image:: https://user-images.githubusercontent.com/594871/76201330-ffcba880-61ea-11ea-9fdd-cc32a90deecd.png
    :target: https://user-images.githubusercontent.com/594871/76201330-ffcba880-61ea-11ea-9fdd-cc32a90deecd.png
