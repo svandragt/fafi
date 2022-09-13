@@ -6,26 +6,32 @@ import click
 
 # fafi
 from . import appdata
-from . import db
-from . import firefox as app_firefox
 from . import core
+from . import db
+from . import import_firefox
+from . import import_list
 
 
 @click.group()
 def main():
     pass
 
+
 @click.command("index")
 @click.option("--firefox", required=False, is_flag=True, help="Import Firefox profile.")
 @click.option("--url", required=False, default=None, help="Import single URL.")
-def action_index(url, firefox):
+@click.option("--list", required=False, default=None, help="Import list of URLs.")
+def action_index(url, list, firefox):
     with db.connect(appdata.data_path(silent=False)) as fafi:
         db.create_table(fafi)
 
     if firefox:
-        app_firefox.index()
+        import_firefox.index()
+    if list:
+        import_list.index(list)
     if url:
         core.index_site(url)
+
 
 @click.command("search")
 @click.argument("keywords")
