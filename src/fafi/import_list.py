@@ -2,7 +2,9 @@
 Import a list of URLS. Acceptable input is a text file containing one or more URLs, detected by a regex.
 """
 import re
+
 from . import core
+
 
 def index(list):
     contents = None

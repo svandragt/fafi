@@ -6,15 +6,16 @@ import click
 
 # fafi
 from . import appdata
+from . import core
 from . import db
 from . import import_firefox
-from . import core
 from . import import_list
 
 
 @click.group()
 def main():
     pass
+
 
 @click.command("index")
 @click.option("--firefox", required=False, is_flag=True, help="Import Firefox profile.")
