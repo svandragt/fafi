@@ -23,10 +23,11 @@ def create_table(conn):
     :return:
     """
     c = conn.cursor()
-    c.execute(
-        "CREATE VIRTUAL TABLE IF NOT EXISTS sites USING FTS5(url, text, date_bm_added)"
-    )
+    c.execute( "CREATE VIRTUAL TABLE IF NOT EXISTS sites2 USING FTS5(title, url, text, date_bm_added)")
+    c.execute( "INSERT OR IGNORE INTO sites2 (url, text, date_bm_added) SELECT url, text, date_bm_added FROM sites")
+    c.execute( "DELETE FROM sites")
     conn.commit()
+    c.execute("VACUUM")
 
 
 # execute a query on sqlite cursor
@@ -43,17 +44,19 @@ def execute_query(cursor, query, args=None):
 def search(conn, keywords, max_results):
     cursor = conn.execute(
         """SELECT 
+                title,
                 url, 
-                snippet(sites, 1,'[', ']', '...',32) 
+                snippet(sites2, 2,'[', ']', '...',64) 
             FROM 
-                sites 
+                sites2 
             WHERE 
-                text MATCH ? 
+                title MATCH ? OR
+                text MATCH ?
             ORDER BY 
                 rank 
             LIMIT ?
         """,
-        (keywords, max_results),
+        (keywords, keywords, max_results),
     )
     if cursor.rowcount == 0:
         return None
@@ -65,7 +68,7 @@ def last_row_bm_date(conn):
         """SELECT 
                 date_bm_added
             FROM 
-                sites
+                sites2
             ORDER by date_bm_added DESC
             LIMIT 1
         """

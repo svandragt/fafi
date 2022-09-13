@@ -35,8 +35,6 @@ def create_temporary_copy(path):
 def get_last_row_bm_date():
     sqlite_path = data_path()
     with db.connect(sqlite_path) as fafi:
-        db.create_table(fafi)
-
         return db.last_row_bm_date(fafi)
 
 

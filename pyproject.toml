@@ -11,6 +11,7 @@ python = "^3.7"
 newspaper3k = "^0.2"
 click = "^8.0"
 appdirs = "^1.4"
+textual = "^0.1.18"
 
 [tool.poetry.dev-dependencies]
 black = "^21.4b2"
