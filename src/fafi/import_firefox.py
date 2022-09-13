@@ -1,3 +1,7 @@
+"""
+Import Firefox bookmarks by indexing the user profile's placesdb.
+"""
+
 import datetime
 import os
 from contextlib import closing

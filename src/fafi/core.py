@@ -8,7 +8,7 @@ from . import appdata, db
 
 def index_site(url, date_bm_added=None):
     if _is_ignored_url(url):
-        print("\nIGNORED", url)
+        print("IGNORED", url)
         return
 
     with db.connect(appdata.data_path()) as fafi:
@@ -16,7 +16,7 @@ def index_site(url, date_bm_added=None):
         cursor = fafi.cursor()
         cursor.execute("SELECT url FROM sites WHERE url=?", (url,))
         if cursor.fetchone():
-            print("\nEXISTS", url)
+            print("EXISTS", url)
             return
 
         # Skip errors
@@ -25,7 +25,7 @@ def index_site(url, date_bm_added=None):
             article.download()
             article.parse()
         except newspaper.article.ArticleException:
-            print("\nERROR", article.download_exception_msg, article.url)
+            print("ERROR", article.download_exception_msg, article.url)
             return
 
         # Fallback to now
@@ -38,7 +38,7 @@ def index_site(url, date_bm_added=None):
             (url, article.text, date_bm_added),
         )
         fafi.commit()
-        print("\n✓", url, "(", str(d), ")")
+        print("✓", url, "(", str(d), ")")
 
 
 def _is_ignored_url(url):
