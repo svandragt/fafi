@@ -14,7 +14,7 @@ def index_site(url, date_bm_added=None):
     with db.connect(appdata.data_path()) as fafi:
         # Skip if the url exists
         cursor = fafi.cursor()
-        cursor.execute("SELECT url FROM sites WHERE url=?", (url,))
+        cursor.execute("SELECT url FROM sites2 WHERE url=?", (url,))
         if cursor.fetchone():
             print("EXISTS", url)
             return
@@ -33,9 +33,10 @@ def index_site(url, date_bm_added=None):
             date_bm_added = time.time()
 
         d = datetime.datetime.fromtimestamp(date_bm_added / 1000000)
+
         cursor.execute(
-            "INSERT INTO sites (url, text, date_bm_added) VALUES(?,?,?)",
-            (url, article.text, date_bm_added),
+            "INSERT INTO sites2 (title, url, text, date_bm_added) VALUES(?, ?,?,?)",
+            (article.title, url, article.text, date_bm_added),
         )
         fafi.commit()
         print("✓", url, "(", str(d), ")")
