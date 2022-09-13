@@ -6,7 +6,7 @@ Fafi (short for Favorites Finder) is a commandline client to search indexed webp
 
 Things it does:
 
-* Adding single urls.
+* Index single urls, text files containing urls, firefox profiles.
 * Incrementally indexing the places database from the Firefox profile folder. (The browser bookmarks) It supports picking a profile from multiple profiles.
 * Extract main text content.
 * Skips .local, localhost and .test domains.
@@ -24,6 +24,7 @@ Users
    fafi --help
    fafi index --firefox
    fafi index --url=https://mylink
+   fafi index --list=bookmarks.html
    fafi search 'linux'
 
 Developers
