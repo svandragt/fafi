@@ -6,7 +6,7 @@ import tempfile
 import appdirs
 
 # fafi
-from . import db
+from fafi import db
 
 config = None
 

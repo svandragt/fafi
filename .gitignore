@@ -1,4 +1,7 @@
+build/
 dist/
 /requirements.txt
 /bookmarks.html
-textual.log
+*.log
+*.spec
+*.zip

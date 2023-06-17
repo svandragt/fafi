@@ -8,11 +8,11 @@ import os
 import click
 
 # fafi
-from . import appdata
-from . import core
-from . import db
-from . import import_firefox
-from . import import_list
+from fafi import appdata
+from fafi import core
+from fafi import db
+from fafi import import_firefox
+from fafi import import_list
 
 
 @click.group()
