@@ -42,7 +42,7 @@ def action_index(url, list, firefox):
     "--max-results", default=99, show_default=True, help="Return <int> results",
 )
 def action_search(keywords, max_results):
-    MyApp.run(title="Fafi",keywords=keywords,max_results=max_results, log="textual.log")
+    MyApp.run(title="Fafi",keywords=keywords,max_results=max_results)
 
 
 main.add_command(action_index)
