@@ -3,7 +3,7 @@ Import a list of URLS. Acceptable input is a text file containing one or more UR
 """
 import re
 
-from . import core
+from fafi import core
 
 
 def index(list):

@@ -3,7 +3,7 @@ import time
 
 import newspaper
 
-from . import appdata, db
+from fafi import appdata, db
 
 
 def index_site(url, date_bm_added=None):

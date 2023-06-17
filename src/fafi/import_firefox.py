@@ -8,7 +8,7 @@ from contextlib import closing
 
 import appdirs
 
-from . import appdata, db, core, input
+from fafi import appdata, db, core, input
 
 
 def _get_application_data_path():

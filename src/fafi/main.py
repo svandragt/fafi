@@ -8,11 +8,11 @@ import os
 import click
 
 # fafi
-from . import appdata
-from . import core
-from . import db
-from . import import_firefox
-from . import import_list
+from fafi import appdata
+from fafi import core
+from fafi import db
+from fafi import import_firefox
+from fafi import import_list
 
 
 @click.group()
@@ -42,15 +42,11 @@ def action_index(url, list, firefox):
     "--max-results", default=99, show_default=True, help="Return <int> results",
 )
 def action_search(keywords, max_results):
-    MyApp.run(title="Fafi",keywords=keywords,max_results=max_results, log="textual.log")
+    MyApp.run(title="Fafi",keywords=keywords,max_results=max_results)
 
 
 main.add_command(action_index)
 main.add_command(action_search)
-
-if __name__ == "__main__":
-    main()
-
 
 
 class MyApp(App):
@@ -99,3 +95,8 @@ class MyApp(App):
             await self.set_focus(body)
 
         await self.call_later(do_search)
+
+
+# Must be under MyApp otherwise PyInstaller gets confused!
+if __name__ == "__main__":
+    main()
