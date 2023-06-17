@@ -48,10 +48,6 @@ def action_search(keywords, max_results):
 main.add_command(action_index)
 main.add_command(action_search)
 
-if __name__ == "__main__":
-    main()
-
-
 
 class MyApp(App):
     def __init__(self, *args, keywords, max_results, **kwargs):
@@ -99,3 +95,8 @@ class MyApp(App):
             await self.set_focus(body)
 
         await self.call_later(do_search)
+
+
+# Must be under MyApp otherwise PyInstaller gets confused!
+if __name__ == "__main__":
+    main()
