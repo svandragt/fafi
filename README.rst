@@ -39,7 +39,7 @@ Developers
    poetry run fafi --help
  
 
-.. image:: https://user-images.githubusercontent.com/594871/76201330-ffcba880-61ea-11ea-9fdd-cc32a90deecd.png
-   :target: https://user-images.githubusercontent.com/594871/76201330-ffcba880-61ea-11ea-9fdd-cc32a90deecd.png
-   :alt: search query
+.. image:: 
+   :target: https://github.com/svandragt/fafi/assets/594871/d70bd34c-009c-4ead-9083-1ddc9a88ec29
+   :alt: TUI results for search query "linux"
 
