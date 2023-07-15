@@ -49,12 +49,13 @@ def search(conn, keywords, max_results):
                 sites2 
             WHERE 
                 title MATCH ? OR
+                url MATCH ? OR
                 text MATCH ?
             ORDER BY 
                 rank 
             LIMIT ?
         """,
-        (keywords, keywords, max_results),
+        (keywords, keywords, keywords, max_results),
     )
     if cursor.rowcount == 0:
         return None
