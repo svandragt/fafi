@@ -24,8 +24,6 @@ def create_table(conn):
     """
     c = conn.cursor()
     c.execute( "CREATE VIRTUAL TABLE IF NOT EXISTS sites2 USING FTS5(title, url, text, date_bm_added)")
-    c.execute( "INSERT OR IGNORE INTO sites2 (url, text, date_bm_added) SELECT url, text, date_bm_added FROM sites")
-    c.execute( "DELETE FROM sites")
     conn.commit()
     c.execute("VACUUM")
 

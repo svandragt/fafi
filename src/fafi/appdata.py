@@ -1,3 +1,4 @@
+import click
 import configparser
 import os
 import shutil
@@ -12,7 +13,12 @@ config = None
 
 
 def data_path(silent=True):
-    sqlite_path = get_data_dir() + "/data.sqlite"
+    global config
+    sqlite_path = load_option('sqlite_path')
+
+    if not sqlite_path:
+        sqlite_path = get_data_dir() + "/data.sqlite"
+        save_option('sqlite_path', sqlite_path)
     if not silent:
         print("Store: " + sqlite_path)
     return sqlite_path
@@ -39,22 +45,31 @@ def get_last_row_bm_date():
 
 
 def get_config_path():
-    return get_data_dir() + "/config.ini"
+    context = click.get_current_context()
+    fn = context.parent.params["config"]
+    return fn
 
 
-def load_config():
+def load_option(name=None):
     global config
 
     if not config:
         config = configparser.ConfigParser()
         config.read(get_config_path())
+        print("Config: " + get_config_path())
 
+    if name:
+        try:
+            return config['DEFAULT'][name]
+        except KeyError:
+            return None
     return config
 
 
-def save_config(name, value):
+def save_option(name, value):
     global config
-    config = load_config()
+    if not config:
+        config = load_option()
 
     config['DEFAULT'][name] = value
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from textual import events
 from textual.app import App
-from textual.widgets import Header, Footer, Placeholder, ScrollView
+from textual.widgets import Header, Footer, ScrollView
 
 import os
 
@@ -16,7 +16,9 @@ from fafi import import_list
 
 
 @click.group()
-def main():
+@click.option("--config", required=False, default=appdata.get_data_dir() + "/config.ini", help="Path to config.ini")
+def main(config):
+    # config missing as global option
     pass
 
 

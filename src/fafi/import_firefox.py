@@ -33,15 +33,7 @@ def _get_places_dbs():
 def index():
     places_dbs = _get_places_dbs()
     if places_dbs:
-        config = appdata.load_config()
-        try:
-            places_db = config['DEFAULT']['firefox_places_db']
-        except KeyError:
-            try:
-                places_db = config['DEFAULT']['places_db']
-                appdata.save_config('places_db', None)
-            except KeyError:
-                places_db = None
+        places_db = appdata.load_option('firefox_places_db')
 
         # Handle profile deletion
         if not os.path.exists(places_db):
@@ -50,7 +42,7 @@ def index():
         if not places_db:
             choice = input.let_user_pick(places_dbs)
             places_db = places_dbs[choice - 1]
-            appdata.save_config('firefox_places_db', places_db)
+            appdata.save_option('firefox_places_db', places_db)
 
         print('Places:', places_db)
         _index_with_places(places_db)
