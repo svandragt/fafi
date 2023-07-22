@@ -39,12 +39,12 @@ def execute_query(cursor, query, args=None):
         print(str(error) + "\n " + query)
 
 
-def search(conn, keywords, max_results):
+def search(conn, keywords, max_results,before='[', after=']'):
     cursor = conn.execute(
         """SELECT 
                 title,
                 url, 
-                snippet(sites2, 2,'[', ']', '...',64) 
+                snippet(sites2, 2,?,?, '...',64) 
             FROM 
                 sites2 
             WHERE 
@@ -55,7 +55,7 @@ def search(conn, keywords, max_results):
                 rank 
             LIMIT ?
         """,
-        (keywords, keywords, keywords, max_results),
+        (before, after, keywords, keywords, keywords, max_results),
     )
     if cursor.rowcount == 0:
         return None

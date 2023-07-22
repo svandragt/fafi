@@ -5,35 +5,87 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>Fafi</title>
 	<link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
+	<style type="text/css">
+		body > footer {
+			padding: 0.25em;
+		}
+
+		body > header {
+			padding-bottom: 0;
+		}
+
+		blockquote {
+			font-size: 1rem;
+			margin-top:1em;
+		}
+
+		header form {
+			margin: 0 auto;
+		}
+
+		h1 {
+			float: left;
+			font-size: 1.25rem;
+		}
+
+		h1 a {
+			text-decoration: none;
+			font-weight: normal;
+		}
+
+		ol {
+			margin-top: 0;
+		}
+
+		ol li {
+			margin-bottom: 1em;
+		}
+
+		li h4 {
+			margin:0;
+		}
+
+		li small {
+			color: grey;
+		}
+
+		p {
+			margin-top: 0.5em;
+		}
+
+	</style>
 </head>
 <body>
-	<h1>Fafi</h1>
-
-	{% if query %}
-	<p>You searched for <em>{{query}}</em>.
-		{% if results %}
-			{{ results | length }} results:
-		{% endif %}
-	</p>
-	{% endif %}
-
-
+  <header>
+  	<h1><a href="/">Fafi</a></h1>
 	<form action="/">
-		<input type="text" name="query" value="{{query}}">
+		<input type="text" name="query" value="{{query}}" size=24>
 		<input type="submit" name="search" value="Search">
 	</form>
+  </header>
+
+	{% if query %}
+	<p><small>You searched for <mark>{{query}}</mark>.
+		{% if results %}
+			{{ results | length }} result{{ results | length | pluralize }}:
+		{% endif %}
+	</small></p>
+	{% endif %}
 
 	
 	{% if results %}
 		<ol>
 		{% for i in results %}
 			<li>
-				<h2><a href="{{i[1]}}">{{i[0]}}</a></h2>
-				<p><em>{{i[2]}}</em>
+				<h4><a href="{{i[1]}}">{{i[0]}}</a></h2>
+				<small>{{i[1] | domain}}</small>
+				<blockquote>{{i[2] | safe }}</blockquote>
 			</li>
 		{% endfor %}
-		</ul>
+		</ol>
 	{% endif %}
+
+	<footer><small><em><a href="https://github.com/svandragt/fafi/">Fafi</a> -- Web content indexing and search tool.</em></small></footer>
 
 </body>
 </html>
