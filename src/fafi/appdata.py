@@ -49,8 +49,7 @@ def get_config_path():
     fn = context.parent.params["config"]
     return fn
 
-
-def load_option(name=None):
+def load_config():
     global config
 
     if not config:
@@ -58,18 +57,23 @@ def load_option(name=None):
         config.read(get_config_path())
         print("Config: " + get_config_path())
 
+    return config
+
+
+def load_option(name=None):
+    config = load_config()
+
     if name:
         try:
             return config['DEFAULT'][name]
         except KeyError:
             return None
-    return config
+    return none
 
 
 def save_option(name, value):
     global config
-    if not config:
-        config = load_option()
+    config = load_config()
 
     config['DEFAULT'][name] = value
 

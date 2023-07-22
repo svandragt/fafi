@@ -18,6 +18,18 @@
 		<input type="submit" name="search" value="Search">
 	</form>
 
+	
+	{% if results %}
+	there's results
+	{% for i in results %}
+		<h2>{{i[0]}}</h2>
+		1: {{i[1]}}<br>
+		2: {{i[2]}}
+	{% endfor %}
+	{% else %}
+	There's no cursor
+	{% endif %}
+
 
 
 </body>
