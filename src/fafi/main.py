@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 from textual import events
 from textual.app import App
-from textual.widgets import Header, Footer, ScrollView
+from textual.widgets import Header, Footer
+from textual.scroll_view import ScrollView
 
 import os
 
@@ -18,8 +19,7 @@ from fafi import import_list
 @click.group()
 @click.option("--config", required=False, default=appdata.get_data_dir() + "/config.ini", help="Path to config.ini")
 def main(config):
-    # config missing as global option
-    pass
+    """Run the Fafi CLI."""
 
 
 @click.command("index")
@@ -46,9 +46,16 @@ def action_index(url, list, firefox):
 def action_search(keywords, max_results):
     MyApp.run(title="Fafi",keywords=keywords,max_results=max_results)
 
+@click.command("serve")
+@click.option('--host', default='0.0.0.0')
+@click.option('--port', default=5000, type=int)
+def action_serve(host: str, port: int):
+    from fafi.webui import app
+    app.run(host=host, port=port)
 
 main.add_command(action_index)
 main.add_command(action_search)
+main.add_command(action_serve)
 
 
 class MyApp(App):

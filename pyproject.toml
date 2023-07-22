@@ -11,7 +11,8 @@ python = ">=3.11,<3.12"
 newspaper3k = "^0.2"
 click = "^8.0"
 appdirs = "^1.4"
-textual = "^0.29"
+flask = "^2.3.2"
+textual = "^0.30.0"
 
 [tool.poetry.dev-dependencies]
 black = "^23"
