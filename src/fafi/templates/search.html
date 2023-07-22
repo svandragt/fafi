@@ -4,12 +4,17 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>Fafi</title>
+	<link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
 </head>
 <body>
 	<h1>Fafi</h1>
 
 	{% if query %}
-	<p>You searched for {{query}}.
+	<p>You searched for <em>{{query}}</em>.
+		{% if results %}
+			{{ results | length }} results:
+		{% endif %}
+	</p>
 	{% endif %}
 
 
@@ -20,17 +25,15 @@
 
 	
 	{% if results %}
-	there's results
-	{% for i in results %}
-		<h2>{{i[0]}}</h2>
-		1: {{i[1]}}<br>
-		2: {{i[2]}}
-	{% endfor %}
-	{% else %}
-	There's no cursor
+		<ol>
+		{% for i in results %}
+			<li>
+				<h2><a href="{{i[1]}}">{{i[0]}}</a></h2>
+				<p><em>{{i[2]}}</em>
+			</li>
+		{% endfor %}
+		</ul>
 	{% endif %}
-
-
 
 </body>
 </html>
