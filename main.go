@@ -4,6 +4,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -13,6 +14,20 @@ var tpl = template.Must(template.ParseFiles("pub/index.html"))
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	tpl.Execute(w, nil)
+	_ = getSearchQuery(w, r)
+}
+
+func getSearchQuery(w http.ResponseWriter, r *http.Request) string {
+	u, err := url.Parse(r.URL.String())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return ""
+	}
+
+	params := u.Query()
+	searchQuery := params.Get("q")
+	log.Println("Search: ", searchQuery)
+	return searchQuery
 }
 
 func startServer(port string) {
