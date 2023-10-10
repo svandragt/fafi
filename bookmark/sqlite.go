@@ -26,7 +26,6 @@ type Database struct {
 }
 
 func NewDatabase(db *sql.DB) *Database {
-	log.Println("New database")
 	return &Database{
 		db: db,
 	}
@@ -43,7 +42,8 @@ func (r *Database) Migrate() error {
     `
 	_, err := r.db.Exec(query)
 	if err != nil {
-		log.Fatal("Create table error:", err)
+		log.Println("Info:", err)
+		return nil
 	}
 
 	// TODO:
