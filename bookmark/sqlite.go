@@ -9,6 +9,9 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/mattn/go-sqlite3"
+	"log"
+	"os"
+	"time"
 )
 
 var (
@@ -23,6 +26,7 @@ type Database struct {
 }
 
 func NewDatabase(db *sql.DB) *Database {
+	log.Println("New database")
 	return &Database{
 		db: db,
 	}
@@ -31,22 +35,46 @@ func NewDatabase(db *sql.DB) *Database {
 func (r *Database) Migrate() error {
 	query := `
 	CREATE VIRTUAL TABLE bookmarks USING FTS5(
-	    url PRIMARY KEY, 
+	    url, 
 	    title, 
 	    text, 
 	    date_added
 	);
     `
-
 	_, err := r.db.Exec(query)
+	if err != nil {
+		log.Fatal("Create table error:", err)
+	}
+
+	// TODO:
+	if os.Getenv("FAFI_SKIP_RECORDS") == "" {
+		bms := [2]Bookmark{
+			{
+				Title: "test 1",
+				URL:   "https://vandragt.com",
+			},
+			{
+				Title: "test 2",
+				URL:   "https://github.com/svandragt/fafi",
+			},
+		}
+		for _, bm := range bms {
+			_, err := r.Create(bm)
+			if err != nil {
+				log.Fatal("Create sample records error:", err)
+			}
+		}
+	}
 	return err
 }
 
 func (r *Database) Create(bm Bookmark) (*Bookmark, error) {
+	bm.DateAdded = time.Now()
+
 	query := `
 INSERT INTO bookmarks(url, title, text, date_added) values(?,?,?,?)
 `
-	res, err := r.db.Exec(query, bm.URL, bm.Title, bm.Text, bm.DateAdded)
+	_, err := r.db.Exec(query, bm.URL, bm.Title, bm.Text, bm.DateAdded)
 	if err != nil {
 		var sqliteErr sqlite3.Error
 		if errors.As(err, &sqliteErr) {
@@ -56,12 +84,6 @@ INSERT INTO bookmarks(url, title, text, date_added) values(?,?,?,?)
 		}
 		return nil, err
 	}
-
-	id, err := res.LastInsertId()
-	if err != nil {
-		return nil, err
-	}
-	bm.ID = id
 
 	return &bm, nil
 }
@@ -76,7 +98,7 @@ func (r *Database) All() ([]Bookmark, error) {
 	var all []Bookmark
 	for rows.Next() {
 		var bm Bookmark
-		if err := rows.Scan(&bm.ID, &bm.Name, &bm.URL, &bm.Rank); err != nil {
+		if err := rows.Scan(&bm.Title, &bm.Text, &bm.URL, &bm.DateAdded); err != nil {
 			return nil, err
 		}
 		all = append(all, bm)
@@ -84,15 +106,56 @@ func (r *Database) All() ([]Bookmark, error) {
 	return all, nil
 }
 
-func (r *Database) GetByName(name string) (*Bookmark, error) {
-	row := r.db.QueryRow("SELECT * FROM bookmarks WHERE name = ?", name)
+func (r *Database) GetByUrl(url string) (*Bookmark, error) {
+	row := r.db.QueryRow("SELECT * FROM bookmarks WHERE url = ?", url)
 
 	var bm Bookmark
-	if err := row.Scan(&bm.ID, &bm.Name, &bm.URL, &bm.Rank); err != nil {
+	if err := row.Scan(&bm.Title, &bm.Text, &bm.URL, &bm.DateAdded); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotExists
 		}
 		return nil, err
 	}
 	return &bm, nil
+}
+
+func (r *Database) Update(url string, updated Bookmark) (*Bookmark, error) {
+	res, err := r.db.Exec(
+		"UPDATE bookmarks SET title = ?, text = ? WHERE url = ?",
+		updated.Title,
+		updated.Text,
+		url,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+
+	if rowsAffected == 0 {
+		return nil, ErrUpdateFailed
+	}
+
+	return &updated, nil
+}
+
+func (r *Database) Delete(url string) error {
+	res, err := r.db.Exec("DELETE FROM bookmarks WHERE url = ?", url)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return ErrDeleteFailed
+	}
+
+	return err
 }

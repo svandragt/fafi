@@ -2,7 +2,7 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
+	"fafi2/bookmark"
 	"html/template"
 	"log"
 	"net/http"
@@ -42,16 +42,25 @@ func bootServer() {
 
 // Database access
 func bootDatabase() *sql.DB {
-	db, err := sql.Open("sqlite3", "file:fafi.sqlite3")
+	fn := "fafi.sqlite3"
+	log.Println("Using " + fn)
+	db, err := sql.Open("sqlite3", "file:"+fn)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("DB Opening error:", err)
 	}
 	var version string
 	err = db.QueryRow("SELECT SQLITE_VERSION()").Scan(&version)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("SQLite error:", err)
 	}
-	fmt.Println("SQLite3 version", version)
+	log.Println("SQLite3 version", version)
+
+	database := bookmark.NewDatabase(db)
+
+	if err := database.Migrate(); err != nil {
+		log.Fatal("Migration error:", err)
+	}
+
 	return db
 }
 
@@ -59,7 +68,7 @@ func bootDatabase() *sql.DB {
 func bootEnvironment() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Environment error:", err)
 	}
 }
 
