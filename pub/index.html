@@ -1,82 +1,92 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>Fafi</title>
-	<link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
-	<style type="text/css">
-		body > footer {
-			padding: 0.25em;
-		}
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Fafi</title>
+    <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
+    <style type="text/css">
+        body > footer {
+            padding: 0.25em;
+        }
 
-		body > header {
-			padding-bottom: 0;
-		}
+        body > header {
+            padding-bottom: 0;
+        }
 
-		blockquote {
-			font-size: 1rem;
-			margin-top:1em;
-		}
+        blockquote {
+            font-size: 1rem;
+            margin-top: 1em;
+        }
 
-		header form {
-			margin: 0 auto;
-		}
+        header form {
+            margin: 0 auto;
+        }
 
-		h1 {
-			float: left;
-			font-size: 1.25rem;
-		}
+        h1 {
+            float: left;
+            font-size: 1.25rem;
+        }
 
-		h1 a {
-			text-decoration: none;
-			font-weight: normal;
-		}
+        h1 a {
+            text-decoration: none;
+            font-weight: normal;
+        }
 
-		ol {
-			margin-top: 0;
-		}
+        ol {
+            margin-top: 0;
+        }
 
-		ol li {
-			margin-bottom: 1em;
-		}
+        ol li {
+            margin-bottom: 1em;
+        }
 
-		li h4 {
-			margin:0;
-		}
+        li h4 {
+            margin: 0;
+        }
 
-		li small {
-			color: grey;
-		}
+        li small {
+            color: grey;
+        }
 
-		p {
-			margin-top: 0.5em;
-		}
+        p {
+            margin-top: 0.5em;
+        }
 
-	</style>
+    </style>
 </head>
 <body>
-  <header>
-  	<h1><a href="/">Fafi</a></h1>
-	<form action="/">
-		<input type="text" name="q" value="" size=24 placeholder="Bookmark search">
-		<input type="submit" name="search" value="Search">
-	</form>
-  </header>
+<header>
+    <h1><a href="/">Fafi</a></h1>
+    <form action="/">
+        <input type="text" name="q" value="{{.Query}}" size=24 placeholder="Bookmark search">
+        <input type="submit" name="search" value="Search">
+    </form>
+</header>
 
-	<p><small>You searched for <mark>query</mark>.
-	</small></p>
+<p>
+{{ if .Query }}
+<small>You searched for
+    <mark>{{.Query}}</mark>
+    .
+</small>
+{{ end }}
+</p>
 
+<ol>
+    {{range .Bookmarks}}
+    <li>
+        <h4><a href="">{{.Title}}</a></h2>
+            <small>{{.URL}}</small>
+            {{ if .Text }}
+            <blockquote>{{.Text}}</blockquote>
+            {{ end }}
+    </li>
+    {{end}}
+</ol>
 
-		<ol>
-			<li>
-				<h4><a href="">result</a></h2>
-				<small>example.com</small>
-				<blockquote>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</blockquote>
-			</li>
-		</ol>
-
-	<footer><small><em><a href="https://github.com/svandragt/fafi/">Fafi</a> -- Web content indexing and search tool.</em></small></footer>
+<footer><small><em><a href="https://github.com/svandragt/fafi/">Fafi</a> -- Web content indexing and search
+    tool.</em></small></footer>
 
 </body>
 </html>

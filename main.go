@@ -13,7 +13,12 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-var tpl = template.Must(template.ParseFiles("pub/index.html"))
+var bmDb *bookmark.Database
+
+type PageData struct {
+	Bookmarks []bookmark.Bookmark
+	Query     string
+}
 
 func main() {
 	bootEnvironment()
@@ -48,6 +53,7 @@ func bootDatabase() *sql.DB {
 	if err != nil {
 		log.Fatal("DB Opening error:", err)
 	}
+
 	var version string
 	err = db.QueryRow("SELECT SQLITE_VERSION()").Scan(&version)
 	if err != nil {
@@ -55,9 +61,9 @@ func bootDatabase() *sql.DB {
 	}
 	log.Println("SQLite3 version", version)
 
-	database := bookmark.NewDatabase(db)
+	bmDb = bookmark.NewDatabase(db)
 
-	if err := database.Migrate(); err != nil {
+	if err := bmDb.Migrate(); err != nil {
 		log.Fatal("Migration error:", err)
 	}
 
@@ -73,8 +79,20 @@ func bootEnvironment() {
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
-	tpl.Execute(w, nil)
-	_ = getSearchQuery(w, r)
+	bookmarks, err := bmDb.All()
+	if err != nil {
+		log.Fatal("Error:", err)
+	}
+	var tpl = template.Must(template.ParseFiles("pub/index.html"))
+
+	data := PageData{
+		Bookmarks: bookmarks,
+		Query:     getSearchQuery(w, r),
+	}
+	err = tpl.Execute(w, data)
+	if err != nil {
+		log.Fatal("Error (execute):", err)
+	}
 }
 
 func getSearchQuery(w http.ResponseWriter, r *http.Request) string {

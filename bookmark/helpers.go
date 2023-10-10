@@ -46,15 +46,16 @@ func (r *Database) Migrate() error {
 		return nil
 	}
 
-	// TODO:
+	log.Println("Database created")
+
 	if os.Getenv("FAFI_SKIP_RECORDS") == "" {
 		bms := [2]Bookmark{
 			{
-				Title: "test 1",
+				Title: "Sander's Notes",
 				URL:   "https://vandragt.com",
 			},
 			{
-				Title: "test 2",
+				Title: "Fafi Homepage",
 				URL:   "https://github.com/svandragt/fafi",
 			},
 		}
@@ -64,17 +65,18 @@ func (r *Database) Migrate() error {
 				log.Fatal("Create sample records error:", err)
 			}
 		}
+		log.Println("Sample records created")
 	}
 	return err
 }
 
 func (r *Database) Create(bm Bookmark) (*Bookmark, error) {
-	bm.DateAdded = time.Now()
+	bm.DateAdded = SqlTime(time.Now())
 
 	query := `
 INSERT INTO bookmarks(url, title, text, date_added) values(?,?,?,?)
 `
-	_, err := r.db.Exec(query, bm.URL, bm.Title, bm.Text, bm.DateAdded)
+	_, err := r.db.Exec(query, bm.URL, bm.Title, bm.Text, bm.DateAdded.String())
 	if err != nil {
 		var sqliteErr sqlite3.Error
 		if errors.As(err, &sqliteErr) {
@@ -93,12 +95,17 @@ func (r *Database) All() ([]Bookmark, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			return
+		}
+	}(rows)
 
 	var all []Bookmark
 	for rows.Next() {
 		var bm Bookmark
-		if err := rows.Scan(&bm.Title, &bm.Text, &bm.URL, &bm.DateAdded); err != nil {
+		if err := rows.Scan(&bm.URL, &bm.Title, &bm.Text, &bm.DateAdded); err != nil {
 			return nil, err
 		}
 		all = append(all, bm)
@@ -110,7 +117,7 @@ func (r *Database) GetByUrl(url string) (*Bookmark, error) {
 	row := r.db.QueryRow("SELECT * FROM bookmarks WHERE url = ?", url)
 
 	var bm Bookmark
-	if err := row.Scan(&bm.Title, &bm.Text, &bm.URL, &bm.DateAdded); err != nil {
+	if err := row.Scan(&bm.URL, &bm.Title, &bm.Text, &bm.DateAdded); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotExists
 		}
