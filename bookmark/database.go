@@ -113,6 +113,29 @@ func (r *Database) All() ([]Bookmark, error) {
 	return all, nil
 }
 
+func (r *Database) IndexQueue() ([]Bookmark, error) {
+	rows, err := r.db.Query("SELECT * FROM bookmarks where bookmarks.text = \"\"")
+	if err != nil {
+		return nil, err
+	}
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			return
+		}
+	}(rows)
+
+	var all []Bookmark
+	for rows.Next() {
+		var bm Bookmark
+		if err := rows.Scan(&bm.URL, &bm.Title, &bm.Text, &bm.DateAdded); err != nil {
+			return nil, err
+		}
+		all = append(all, bm)
+	}
+	return all, nil
+}
+
 func (r *Database) GetByUrl(url string) (*Bookmark, error) {
 	row := r.db.QueryRow("SELECT * FROM bookmarks WHERE url = ?", url)
 
@@ -166,3 +189,5 @@ func (r *Database) Delete(url string) error {
 
 	return err
 }
+
+var BmDb *Database

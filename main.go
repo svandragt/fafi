@@ -3,17 +3,14 @@ package main
 import (
 	"database/sql"
 	"fafi2/bookmark"
+	"github.com/joho/godotenv"
+	_ "github.com/mattn/go-sqlite3"
 	"html/template"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
-
-	"github.com/joho/godotenv"
-	_ "github.com/mattn/go-sqlite3"
 )
-
-var bmDb *bookmark.Database
 
 type PageData struct {
 	Bookmarks []bookmark.Bookmark
@@ -23,10 +20,39 @@ type PageData struct {
 func main() {
 	bootEnvironment()
 	db := bootDatabase()
-	defer db.Close()
+	defer func(db *sql.DB) {
+		_ = db.Close()
+	}(db)
 
+	bootIndexer()
 	// Server start
 	bootServer()
+}
+
+// Index any bookmarks without text
+func bootIndexer() {
+	log.Println("Indexer...")
+
+	go func() {
+		for {
+			queue, err := bookmark.BmDb.IndexQueue()
+			log.Println("Queue populated")
+			if err != nil {
+				log.Println("Queue init error:", err)
+				return
+			}
+			for _, bm := range queue {
+				bookmark.Index(bm)
+				if err != nil {
+					log.Println("Indexer error:", err)
+					continue
+				}
+				log.Println("updated " + bm.URL)
+			}
+			log.Println("Queue completed")
+			return
+		}
+	}()
 }
 
 // bootServer Starts Web Server
@@ -61,9 +87,9 @@ func bootDatabase() *sql.DB {
 	}
 	log.Println("SQLite3 version", version)
 
-	bmDb = bookmark.NewDatabase(db)
+	bookmark.BmDb = bookmark.NewDatabase(db)
 
-	if err := bmDb.Migrate(); err != nil {
+	if err := bookmark.BmDb.Migrate(); err != nil {
 		log.Fatal("Migration error:", err)
 	}
 
@@ -79,7 +105,7 @@ func bootEnvironment() {
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
-	bookmarks, err := bmDb.All()
+	bookmarks, err := bookmark.BmDb.All()
 	if err != nil {
 		log.Fatal("Error:", err)
 	}

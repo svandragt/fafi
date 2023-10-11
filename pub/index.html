@@ -81,7 +81,7 @@
 <ol>
     {{range .Bookmarks}}
     <li>
-        <h4><a href="">{{.Title}}</a></h4>
+        <h4><a href="{{.URL}}">{{.Title}}</a></h4>
             <small>{{.URL}}</small>
             {{ if .Text }}
             <blockquote>{{.Text}}</blockquote>
