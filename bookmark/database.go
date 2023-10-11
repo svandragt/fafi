@@ -91,7 +91,7 @@ INSERT INTO bookmarks(url, title, text, date_added) values(?,?,?,?)
 }
 
 func (r *Database) All() ([]Bookmark, error) {
-	rows, err := r.db.Query("SELECT * FROM bookmarks")
+	rows, err := r.db.Query("SELECT * FROM bookmarks ORDER BY date_added DESC, title ASC")
 	if err != nil {
 		return nil, err
 	}
