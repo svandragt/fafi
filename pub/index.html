@@ -84,7 +84,7 @@
         <h4><a href="{{.URL}}">{{.Title}}</a></h4>
             <small>{{.URL}}</small>
             {{ if .Text }}
-            <blockquote>{{.Text}}</blockquote>
+            <blockquote>{{slice .Text 0 320}}&hellip;</blockquote>
             {{ end }}
     </li>
     {{end}}

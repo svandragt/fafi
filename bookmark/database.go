@@ -1,6 +1,3 @@
-// Not sure if we need an bm.ID
-// Currently there is none, but some functions here implement it
-// the URL is the primary key surely to get dedupe for free.
 // TODO FIX https://gosamples.dev/sqlite-intro/
 
 package bookmark
@@ -37,7 +34,8 @@ func (r *Database) Migrate() error {
 	CREATE VIRTUAL TABLE bookmarks USING FTS5(
 	    url, 
 	    title, 
-	    text, 
+	    text,
+	    is_scraped,
 	    date_added
 	);
     `
@@ -52,12 +50,10 @@ func (r *Database) Migrate() error {
 	if os.Getenv("FAFI_SKIP_RECORDS") == "" {
 		bms := [2]Bookmark{
 			{
-				Title: "Sander's Notes",
-				URL:   "https://vandragt.com",
+				URL: "https://vandragt.com",
 			},
 			{
-				Title: "Fafi Homepage",
-				URL:   "https://github.com/svandragt/fafi",
+				URL: "https://github.com/svandragt/fafi",
 			},
 		}
 		for _, bm := range bms {
@@ -92,16 +88,17 @@ INSERT INTO bookmarks(url, title, text, date_added) values(?,?,?,?)
 }
 
 func (r *Database) All(keywords string) ([]Bookmark, error) {
-	query := "SELECT * FROM bookmarks ORDER BY date_added DESC, title ASC LIMIT 50"
+	query := "SELECT * FROM bookmarks ORDER BY date_added DESC, title LIMIT 50"
 
 	var err error
 	var rows *sql.Rows
 	// handle search
 	if keywords != "" {
 		query = `SELECT 
-                title,
                 url, 
-                snippet(bookmarks, 2,?,?, '...',64),
+                title,
+                snippet(bookmarks, 2,?,?, '...',64) as text,
+                is_scraped,
                 date_added
             FROM 
                 bookmarks 
@@ -130,7 +127,7 @@ func (r *Database) All(keywords string) ([]Bookmark, error) {
 	var all []Bookmark
 	for rows.Next() {
 		var bm Bookmark
-		if err := rows.Scan(&bm.URL, &bm.Title, &bm.Text, &bm.DateAdded); err != nil {
+		if err := rows.Scan(&bm.URL, &bm.Title, &bm.Text, &bm.IsScraped, &bm.DateAdded); err != nil {
 			return nil, err
 		}
 		all = append(all, bm)
@@ -145,7 +142,7 @@ func (r *Database) All(keywords string) ([]Bookmark, error) {
 }
 
 func (r *Database) SelectQueue() ([]Bookmark, error) {
-	rows, err := r.db.Query("SELECT * FROM bookmarks where bookmarks.text = \"\"")
+	rows, err := r.db.Query("SELECT * FROM bookmarks where is_scraped is null")
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +156,10 @@ func (r *Database) SelectQueue() ([]Bookmark, error) {
 	var all []Bookmark
 	for rows.Next() {
 		var bm Bookmark
-		if err := rows.Scan(&bm.URL, &bm.Title, &bm.Text, &bm.DateAdded); err != nil {
+		if err := rows.Scan(&bm.URL, &bm.Title, &bm.Text, &bm.IsScraped, &bm.DateAdded); err != nil {
+			if !bm.IsScraped.Valid {
+				return all, nil
+			}
 			return nil, err
 		}
 		all = append(all, bm)
@@ -182,9 +182,10 @@ func (r *Database) GetByUrl(url string) (*Bookmark, error) {
 
 func (r *Database) Update(url string, updated Bookmark) (*Bookmark, error) {
 	res, err := r.db.Exec(
-		"UPDATE bookmarks SET title = ?, text = ? WHERE url = ?",
+		"UPDATE bookmarks SET title = ?, text = ?, is_scraped = ? WHERE url = ?",
 		updated.Title,
 		updated.Text,
+		updated.IsScraped,
 		url,
 	)
 	if err != nil {

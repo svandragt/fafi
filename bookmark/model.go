@@ -1,11 +1,15 @@
 package bookmark
 
-import "time"
+import (
+	"database/sql"
+	"time"
+)
 
 type Bookmark struct {
 	Title     string
 	Text      string
 	URL       string
+	IsScraped sql.NullBool
 	DateAdded SqlTime
 }
 

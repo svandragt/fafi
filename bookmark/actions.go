@@ -1,18 +1,27 @@
 package bookmark
 
 import (
-	"fmt"
+	"database/sql"
+	"github.com/advancedlogic/GoOse"
 	"log"
-	"math/rand"
-	"time"
 )
 
 func Index(bm Bookmark) {
-	rand.Seed(time.Now().UnixNano())
-	randomStr := fmt.Sprint(rand.Intn(1000000) + 1)
-	bm.Text = "random" + randomStr
+	sourceUrl := bm.URL
+	g := goose.New()
+	article, _ := g.ExtractFromURL(sourceUrl)
+	if bm.Title == "" {
+		bm.Title = article.Title
+	}
+	if bm.Text == "" {
+		bm.Text = article.CleanedText
+	}
+	bm.URL = article.FinalURL
+	bm.IsScraped = sql.NullBool{Bool: true, Valid: true}
+
+	// Update
 	bmDb := BmDb
-	_, err := bmDb.Update(bm.URL, bm)
+	_, err := bmDb.Update(sourceUrl, bm)
 	if err != nil {
 		log.Fatal("Update error:", err)
 		return
