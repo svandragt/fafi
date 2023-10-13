@@ -6,5 +6,3 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/mattn/go-sqlite3 v1.14.17
 )
-
-require github.com/go-errors/errors v1.5.1 // indirect

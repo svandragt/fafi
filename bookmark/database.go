@@ -7,7 +7,8 @@ package bookmark
 
 import (
 	"database/sql"
-	"github.com/go-errors/errors"
+	"errors"
+	"fafi2/sander"
 	"github.com/mattn/go-sqlite3"
 	"log"
 	"os"
@@ -134,6 +135,12 @@ func (r *Database) All(keywords string) ([]Bookmark, error) {
 		}
 		all = append(all, bm)
 	}
+
+	log.Println(
+		len(all),
+		sander.Pluralize("result", len(all))+".",
+	)
+
 	return all, nil
 }
 

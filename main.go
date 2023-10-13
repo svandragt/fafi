@@ -135,7 +135,7 @@ func getSearchQuery(w http.ResponseWriter, r *http.Request) string {
 	params := u.Query()
 	searchQuery := params.Get("q")
 	if searchQuery != "" {
-		log.Println("Search: ", searchQuery)
+		log.Println("Searched for: ", searchQuery)
 	}
 	return searchQuery
 }
