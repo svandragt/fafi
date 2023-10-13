@@ -31,12 +31,13 @@ func main() {
 
 // Index any bookmarks without text
 func bootIndexer() {
-	log.Println("Indexer...")
 
 	go func() {
 		for {
-			queue, err := bookmark.BmDb.IndexQueue()
-			log.Println("Queue populated")
+			queue, err := bookmark.BmDb.SelectQueue()
+			if len(queue) > 0 {
+				log.Printf("Queued %d bookmarks\n", len(queue))
+			}
 			if err != nil {
 				log.Println("Queue init error:", err)
 				return
@@ -49,7 +50,9 @@ func bootIndexer() {
 				}
 				log.Println("updated " + bm.URL)
 			}
-			log.Println("Queue completed")
+			if len(queue) > 0 {
+				log.Println("Queue emptied")
+			}
 			return
 		}
 	}()
@@ -67,7 +70,7 @@ func bootServer() {
 	log.Println("Server starting on http://localhost:" + port)
 	err := http.ListenAndServe(":"+port, nil)
 	if err != nil {
-		log.Fatal("Error:", err)
+		log.Fatal("BootServer error: ", err)
 	}
 }
 
@@ -105,15 +108,16 @@ func bootEnvironment() {
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
-	bookmarks, err := bookmark.BmDb.All()
+	keywords := getSearchQuery(w, r)
+	bookmarks, err := bookmark.BmDb.All(keywords)
 	if err != nil {
-		log.Fatal("Error:", err)
+		log.Fatal("Bookmark error:", err)
 	}
 	var tpl = template.Must(template.ParseFiles("pub/index.html"))
 
 	data := PageData{
 		Bookmarks: bookmarks,
-		Query:     getSearchQuery(w, r),
+		Query:     keywords,
 	}
 	err = tpl.Execute(w, data)
 	if err != nil {

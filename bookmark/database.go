@@ -7,7 +7,7 @@ package bookmark
 
 import (
 	"database/sql"
-	"errors"
+	"github.com/go-errors/errors"
 	"github.com/mattn/go-sqlite3"
 	"log"
 	"os"
@@ -90,8 +90,32 @@ INSERT INTO bookmarks(url, title, text, date_added) values(?,?,?,?)
 	return &bm, nil
 }
 
-func (r *Database) All() ([]Bookmark, error) {
-	rows, err := r.db.Query("SELECT * FROM bookmarks ORDER BY date_added DESC, title ASC LIMIT 50")
+func (r *Database) All(keywords string) ([]Bookmark, error) {
+	query := "SELECT * FROM bookmarks ORDER BY date_added DESC, title ASC LIMIT 50"
+
+	var err error
+	var rows *sql.Rows
+	// handle search
+	if keywords != "" {
+		query = `SELECT 
+                title,
+                url, 
+                snippet(bookmarks, 2,?,?, '...',64),
+                date_added
+            FROM 
+                bookmarks 
+            WHERE 
+                title MATCH ? OR
+                url MATCH ? OR
+                text MATCH ?
+            ORDER BY 
+                rank 
+            LIMIT ?
+`
+		rows, err = r.db.Query(query, "[", "]", keywords, keywords, keywords, 50)
+	} else {
+		rows, err = r.db.Query(query)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +137,7 @@ func (r *Database) All() ([]Bookmark, error) {
 	return all, nil
 }
 
-func (r *Database) IndexQueue() ([]Bookmark, error) {
+func (r *Database) SelectQueue() ([]Bookmark, error) {
 	rows, err := r.db.Query("SELECT * FROM bookmarks where bookmarks.text = \"\"")
 	if err != nil {
 		return nil, err
