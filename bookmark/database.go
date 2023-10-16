@@ -35,8 +35,8 @@ func (r *Database) Migrate() error {
 	    url, 
 	    title, 
 	    text,
-	    is_scraped,
-	    date_added
+	    isScraped,
+	    dateAdded
 	);
     `
 	_, err := r.db.Exec(query)
@@ -68,12 +68,17 @@ func (r *Database) Migrate() error {
 }
 
 func (r *Database) Create(bm Bookmark) (*Bookmark, error) {
+
+	existingBookmark, err := BmDb.GetByUrl(bm.URL)
+	if existingBookmark != nil {
+		return existingBookmark, err
+	}
 	bm.DateAdded = SqlTime(time.Now())
 
 	query := `
-INSERT INTO bookmarks(url, title, text, date_added) values(?,?,?,?)
+INSERT INTO bookmarks (url, title, text, dateAdded) VALUES (?, ?, ?, ?);
 `
-	_, err := r.db.Exec(query, bm.URL, bm.Title, bm.Text, bm.DateAdded.String())
+	_, err = r.db.Exec(query, bm.URL, bm.Title, bm.Text, bm.DateAdded.String())
 	if err != nil {
 		var sqliteErr sqlite3.Error
 		if errors.As(err, &sqliteErr) {
@@ -84,11 +89,18 @@ INSERT INTO bookmarks(url, title, text, date_added) values(?,?,?,?)
 		return nil, err
 	}
 
+	log.Println("Created:", bm.URL)
 	return &bm, nil
 }
 
+func (r *Database) CreateMany(bms []Bookmark) {
+	for _, bm := range bms {
+		r.Create(bm)
+	}
+}
+
 func (r *Database) All(keywords string) ([]Bookmark, error) {
-	query := "SELECT * FROM bookmarks ORDER BY date_added DESC, title LIMIT 50"
+	query := "SELECT * FROM bookmarks ORDER BY dateAdded DESC, title LIMIT 50"
 
 	var err error
 	var rows *sql.Rows
@@ -98,8 +110,8 @@ func (r *Database) All(keywords string) ([]Bookmark, error) {
                 url, 
                 title,
                 snippet(bookmarks, 2,?,?, '...',64) as text,
-                is_scraped,
-                date_added
+                isScraped,
+                dateAdded
             FROM 
                 bookmarks 
             WHERE 
@@ -142,7 +154,7 @@ func (r *Database) All(keywords string) ([]Bookmark, error) {
 }
 
 func (r *Database) SelectQueue() ([]Bookmark, error) {
-	rows, err := r.db.Query("SELECT * FROM bookmarks where is_scraped is null")
+	rows, err := r.db.Query("SELECT * FROM bookmarks where isScraped is null")
 	if err != nil {
 		return nil, err
 	}
@@ -171,18 +183,18 @@ func (r *Database) GetByUrl(url string) (*Bookmark, error) {
 	row := r.db.QueryRow("SELECT * FROM bookmarks WHERE url = ?", url)
 
 	var bm Bookmark
-	if err := row.Scan(&bm.URL, &bm.Title, &bm.Text, &bm.DateAdded); err != nil {
+	if err := row.Scan(&bm.URL, &bm.Title, &bm.Text, &bm.IsScraped, &bm.DateAdded); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotExists
 		}
-		return nil, err
+		log.Fatal("GetByUrl error:", err)
 	}
 	return &bm, nil
 }
 
 func (r *Database) Update(url string, updated Bookmark) (*Bookmark, error) {
 	res, err := r.db.Exec(
-		"UPDATE bookmarks SET title = ?, text = ?, is_scraped = ? WHERE url = ?",
+		"UPDATE bookmarks SET title = ?, text = ?, isScraped = ? WHERE url = ?",
 		updated.Title,
 		updated.Text,
 		updated.IsScraped,

@@ -3,6 +3,8 @@ package main
 import (
 	"database/sql"
 	"fafi2/bookmark"
+	"fafi2/integration"
+	"fafi2/sander"
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
 	"html/template"
@@ -18,44 +20,50 @@ type PageData struct {
 }
 
 func main() {
+	args := sander.ParseArguments()
 	bootEnvironment()
 	db := bootDatabase()
 	defer func(db *sql.DB) {
 		_ = db.Close()
 	}(db)
 
-	bootIndexer()
-	// Server start
+	// Check if --firefox argument was present
+	firefoxProfilePath, firefoxPresent := args["firefox"]
+
+	go func() {
+		if firefoxPresent {
+			integration.ImportFirefoxProfile(firefoxProfilePath)
+		}
+		bootIndexer()
+	}()
+
 	bootServer()
 }
 
 // Index any bookmarks without text
 func bootIndexer() {
-
-	go func() {
-		for {
-			queue, err := bookmark.BmDb.SelectQueue()
-			if len(queue) > 0 {
-				log.Printf("Queued %d bookmarks\n", len(queue))
-			}
-			if err != nil {
-				log.Println("Queue init error:", err)
-				return
-			}
-			for _, bm := range queue {
-				bookmark.Index(bm)
-				if err != nil {
-					log.Println("Indexer error:", err)
-					continue
-				}
-				log.Println("updated " + bm.URL)
-			}
-			if len(queue) > 0 {
-				log.Println("Queue emptied")
-			}
+	for {
+		queue, err := bookmark.BmDb.SelectQueue()
+		if len(queue) > 0 {
+			log.Printf("Queued %d bookmarks\n", len(queue))
+		}
+		if err != nil {
+			log.Println("Queue init error:", err)
 			return
 		}
-	}()
+		for _, bm := range queue {
+			bookmark.Index(bm)
+			if err != nil {
+				log.Println("Indexer error:", err)
+				continue
+			}
+			log.Println("updated " + bm.URL)
+		}
+		if len(queue) > 0 {
+			log.Println("Queue emptied")
+		}
+		return
+	}
 }
 
 // bootServer Starts Web Server

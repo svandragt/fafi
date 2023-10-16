@@ -9,8 +9,11 @@ import (
 func Index(bm Bookmark) {
 	sourceUrl := bm.URL
 	g := goose.New()
-	article, _ := g.ExtractFromURL(sourceUrl)
-	if bm.Title == "" {
+	article, err := g.ExtractFromURL(sourceUrl)
+	if err != nil {
+		return
+	}
+	if article.Title != "" {
 		bm.Title = article.Title
 	}
 	if bm.Text == "" {
@@ -21,7 +24,7 @@ func Index(bm Bookmark) {
 
 	// Update
 	bmDb := BmDb
-	_, err := bmDb.Update(sourceUrl, bm)
+	_, err = bmDb.Update(sourceUrl, bm)
 	if err != nil {
 		log.Fatal("Update error:", err)
 		return
