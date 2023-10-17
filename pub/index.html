@@ -34,7 +34,7 @@
         }
 
         label {
-            display:inline-block;
+            display: inline-block;
             padding-top: 0.25em;
         }
 
@@ -70,22 +70,27 @@
 </header>
 
 <p>
-{{ if .Query }}
-<small>You searched for
-    <mark>{{.Query}}</mark>
-    .
-</small>
-{{ end }}
+    {{ if .Query }}
+    <small>You searched for
+        <mark>{{.Query}}</mark>
+        .
+    </small>
+    {{ end }}
 </p>
 
 <ol>
     {{range .Bookmarks}}
     <li>
         <h4><a href="{{.URL}}">{{.Title}}</a></h4>
-            <small>{{.URL}}</small>
-            {{ if .Text }}
-            <blockquote>{{slice .Text 0 320}}&hellip;</blockquote>
+        <small>{{.URL}}</small>
+        {{ if .Text }}
+        <blockquote>{{ if ge (len .Text) 320 }}
+            {{slice .Text 0 320}}&hellip;
+            {{ else }}
+            {{ .Text }}
             {{ end }}
+        </blockquote>
+        {{ end }}
     </li>
     {{end}}
 </ol>

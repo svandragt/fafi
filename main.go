@@ -116,7 +116,6 @@ func bootEnvironment() {
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
-	// FIXME fix slice with string that's too short
 	keywords := getSearchQuery(w, r)
 	bookmarks, err := bookmark.BmDb.All(keywords)
 	if err != nil {
