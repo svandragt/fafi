@@ -1,5 +1,3 @@
-// TODO FIX https://gosamples.dev/sqlite-intro/
-
 package bookmark
 
 import (

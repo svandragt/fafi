@@ -7,6 +7,8 @@ import (
 )
 
 func Index(bm Bookmark) {
+	// TODO handle 400+ http status codes
+	// TODO prevent reindexing the same bookmark next session
 	sourceUrl := bm.URL
 	g := goose.New()
 	article, err := g.ExtractFromURL(sourceUrl)
