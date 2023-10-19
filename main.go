@@ -34,7 +34,11 @@ func main() {
 		if firefoxPresent {
 			integration.ImportFirefoxProfile(firefoxProfilePath)
 		}
-		bootIndexer()
+
+		enableIndexing := os.Getenv("FAFI_ENABLE_INDEXING")
+		if enableIndexing != "0" {
+			bootIndexer()
+		}
 	}()
 
 	bootServer()
