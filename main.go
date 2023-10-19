@@ -38,15 +38,14 @@ func main() {
 	}()
 
 	bootServer()
+	log.Println("Ready")
 }
 
 // Index any bookmarks without text
 func bootIndexer() {
 	for {
 		queue, err := bookmark.BmDb.SelectQueue()
-		if len(queue) > 0 {
-			log.Printf("Queued %d bookmarks\n", len(queue))
-		}
+		log.Printf("Queue has %d bookmarks\n", len(queue))
 		if err != nil {
 			log.Println("Queue init error:", err)
 			return
@@ -58,9 +57,6 @@ func bootIndexer() {
 				continue
 			}
 			log.Println("Indexed " + bm.URL)
-		}
-		if len(queue) > 0 {
-			log.Println("Queue emptied")
 		}
 		return
 	}
