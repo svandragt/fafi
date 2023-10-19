@@ -9,10 +9,10 @@ Web content indexing and search tool
 ```env
 # Defaults are below:
 
-# Port number
+# Port number for the webserver.
 FAFI_PORT=8080
 # Set to non-empty value to skip populating the database with sample records.
 FAFI_SKIP_RECORDS=
-# Set to 0 to disable indexing
+# Set to 0 to disable indexing on startup
 FAFI_ENABLE_INDEXING=1
 ```
