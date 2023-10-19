@@ -9,6 +9,13 @@ import (
 func Index(bm Bookmark) {
 	// TODO handle 400+ http status codes
 	// TODO prevent reindexing the same bookmark next session
+	defer func() {
+		if r := recover(); r != nil {
+			// Handle the panic here, you can log the error or take any other necessary action.
+			log.Println("Recovered from panic:", r)
+		}
+	}()
+
 	sourceUrl := bm.URL
 	g := goose.New()
 	article, err := g.ExtractFromURL(sourceUrl)
