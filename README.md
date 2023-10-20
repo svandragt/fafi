@@ -12,7 +12,9 @@ Web content indexing and search tool
 # Port number for the webserver.
 FAFI_PORT=8080
 # Set to non-empty value to skip populating the database with sample records.
-FAFI_SKIP_RECORDS=
+FAFI_SKIP_RECORDS=0
 # Set to 0 to disable indexing on startup
 FAFI_ENABLE_INDEXING=1
+# Default database path:
+FAFI_DB_FILEPATH=fafi.sqlite3
 ```

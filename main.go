@@ -82,7 +82,7 @@ func bootServer() {
 
 // Database access
 func bootDatabase() *sql.DB {
-	fn := "fafi.sqlite3"
+	fn := sander.GetEnv("FAFI_DB_FILEPATH", "fafi.sqlite3")
 	log.Println("Using " + fn)
 	db, err := sql.Open("sqlite3", "file:"+fn)
 	if err != nil {
