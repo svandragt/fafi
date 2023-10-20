@@ -11,7 +11,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 )
 
 type PageData struct {
@@ -35,11 +34,11 @@ func main() {
 			integration.ImportFirefoxProfile(firefoxProfilePath)
 		}
 
-		enableIndexing := os.Getenv("FAFI_ENABLE_INDEXING")
-		if enableIndexing == "0" {
-			log.Println("ENV: Indexing skipped")
-		} else {
+		enableIndexing := sander.GetEnv("FAFI_ENABLE_INDEXING", "")
+		if enableIndexing != "0" {
 			bootIndexer()
+		} else {
+			log.Println("ENV: Indexing skipped")
 		}
 		log.Println("Ready")
 	}()
@@ -70,10 +69,7 @@ func bootIndexer() {
 
 // bootServer Starts Web Server
 func bootServer() {
-	port := os.Getenv("FAFI_PORT")
-	if port == "" {
-		port = "8080"
-	}
+	port := sander.GetEnv("FAFI_PORT", "8000")
 
 	http.HandleFunc("/", handleIndex)
 

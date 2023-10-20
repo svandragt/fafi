@@ -2,9 +2,9 @@ package bookmark
 
 import (
 	"database/sql"
+	"fafi2/sander"
 	"github.com/advancedlogic/GoOse"
 	"log"
-	"os"
 )
 
 func Index(bm Bookmark) {
@@ -52,7 +52,8 @@ func Index(bm Bookmark) {
 }
 
 func CreateSampleBookmarks(r *Database) {
-	if os.Getenv("FAFI_SKIP_RECORDS") == "" {
+	skipRecords := sander.GetEnv("FAFI_SKIP_RECORDS", "")
+	if skipRecords == "" {
 		bms := [2]Bookmark{
 			{
 				URL: "https://vandragt.com",
