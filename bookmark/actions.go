@@ -31,6 +31,8 @@ func Index(bm Bookmark) {
 	}
 	if article.Title != "" {
 		bm.Title = article.Title
+	} else {
+		bm.Title = article.FinalURL
 	}
 	if bm.Text == "" {
 		bm.Text = article.CleanedText
