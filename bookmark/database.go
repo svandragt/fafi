@@ -91,7 +91,8 @@ func (r *Database) All(keywords string) ([]Bookmark, error) {
 	// handle search
 	if keywords != "" {
 		//goland:noinspection SqlSignature,SqlResolve
-		query = `SELECT 
+		query = `
+			SELECT 
                 url, 
                 title,
                 snippet(bookmarks, 2,?,?, '...',64) as text,
@@ -100,10 +101,11 @@ func (r *Database) All(keywords string) ([]Bookmark, error) {
             FROM 
                 bookmarks 
             WHERE 
-                text is not '' AND
+                text is not '' AND (
                 title MATCH ? OR
                 url MATCH ? OR
                 text MATCH ?
+                )
             ORDER BY 
                 rank 
             LIMIT ?
@@ -140,7 +142,7 @@ func (r *Database) All(keywords string) ([]Bookmark, error) {
 }
 
 func (r *Database) SelectQueue() ([]Bookmark, error) {
-	rows, err := r.db.Query("SELECT * FROM bookmarks where isScraped is null ORDER BY RANDOM()")
+	rows, err := r.db.Query("SELECT * FROM bookmarks where isScraped is not 1 ORDER BY RANDOM()")
 	if err != nil {
 		return nil, err
 	}
