@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"path/filepath"
 )
 
 type PageData struct {
@@ -33,7 +34,6 @@ func main() {
 		if firefoxPresent {
 			integration.ImportFirefoxProfile(firefoxProfilePath)
 		}
-
 		enableIndexing := sander.GetEnv("FAFI_ENABLE_INDEXING", "")
 		if enableIndexing != "0" {
 			bootIndexer()
@@ -82,7 +82,7 @@ func bootServer() {
 
 // Database access
 func bootDatabase() *sql.DB {
-	fn := sander.GetEnv("FAFI_DB_FILEPATH", "fafi.sqlite3")
+	fn := filepath.Clean(sander.GetEnv("FAFI_DB_FILEPATH", "fafi.sqlite3"))
 	log.Println("Using " + fn)
 	db, err := sql.Open("sqlite3", "file:"+fn)
 	if err != nil {
@@ -120,6 +120,8 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatal("Bookmark error:", err)
 	}
+
+	// TODO: embed templates
 	var tpl = template.Must(template.ParseFiles("pub/index.html"))
 
 	data := PageData{
