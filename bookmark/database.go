@@ -90,6 +90,7 @@ func (r *Database) All(keywords string) ([]Bookmark, error) {
 	var rows *sql.Rows
 	// handle search
 	if keywords != "" {
+		//goland:noinspection SqlSignature,SqlResolve
 		query = `SELECT 
                 url, 
                 title,
