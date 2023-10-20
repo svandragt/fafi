@@ -51,7 +51,7 @@ func main() {
 func bootIndexer() {
 	for {
 		queue, err := bookmark.BmDb.SelectQueue()
-		log.Printf("Queue has %d bookmarks\n", len(queue))
+		log.Printf("Indexing queue has %d bookmarks\n", len(queue))
 		if err != nil {
 			log.Println("Queue init error:", err)
 			return

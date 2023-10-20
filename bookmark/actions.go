@@ -9,14 +9,16 @@ import (
 
 func Index(bm Bookmark) {
 	bmDb := BmDb
+	sourceUrl := bm.URL
 	defer func() {
 		if r := recover(); r != nil {
 			// Handle the panic here, you can log the error or take any other necessary action.
 			log.Println("Recovered from panic:", r)
+			bm.IsScraped = sql.NullBool{Bool: true, Valid: true}
+			_, _ = bmDb.Update(sourceUrl, bm)
 		}
 	}()
 
-	sourceUrl := bm.URL
 	log.Println("Indexing:", sourceUrl)
 	g := goose.New()
 	article, err := g.ExtractFromURL(sourceUrl)
@@ -24,11 +26,7 @@ func Index(bm Bookmark) {
 		// Avoid reindexing
 		log.Println("Indexing error:", err)
 		bm.IsScraped = sql.NullBool{Bool: true, Valid: true}
-		_, err = bmDb.Update(sourceUrl, bm)
-		if err != nil {
-			log.Fatal("Update error:", err)
-			return
-		}
+		_, _ = bmDb.Update(sourceUrl, bm)
 		return
 	}
 	if article.Title != "" {
