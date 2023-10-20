@@ -35,7 +35,10 @@ func Index(bm Bookmark) {
 		bm.Title = article.FinalURL
 	}
 	if bm.Text == "" {
-		bm.Text = article.CleanedText
+		// heuristic to filter out bookmarks to files
+		if len(article.Links) > 0 {
+			bm.Text = article.CleanedText
+		}
 	}
 	bm.URL = article.FinalURL
 	bm.IsScraped = sql.NullBool{Bool: true, Valid: true}
