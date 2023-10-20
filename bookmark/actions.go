@@ -62,11 +62,10 @@ func CreateSampleBookmarks(r *Database) {
 			},
 		}
 		for _, bm := range bms {
-			_, err := r.Create(bm)
+			_, err := r.CreateOrGet(bm)
 			if err != nil {
-				log.Fatal("Create sample records error:", err)
+				log.Fatal("CreateOrGet sample records error:", err)
 			}
 		}
-		log.Println("Sample records created")
 	}
 }

@@ -17,7 +17,7 @@ func CopyToTmp(sourcePath, tmpFilename string) (**os.File, error) {
 	// Get the system's default temporary directory
 	tmpDir := os.TempDir()
 
-	// Create a temporary file in the tmp directory
+	// CreateOrGet a temporary file in the tmp directory
 	tmpFile, err := ioutil.TempFile(tmpDir, tmpFilename)
 	if err != nil {
 		return nil, err

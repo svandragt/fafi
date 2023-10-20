@@ -46,7 +46,7 @@ func (r *Database) CreateTable() error {
 	return err
 }
 
-func (r *Database) Create(bm Bookmark) (*Bookmark, error) {
+func (r *Database) CreateOrGet(bm Bookmark) (*Bookmark, error) {
 
 	existingBookmark, err := BmDb.GetByUrl(bm.URL)
 	if existingBookmark != nil {
@@ -75,7 +75,7 @@ INSERT INTO bookmarks (url, title, text, dateAdded) VALUES (?, ?, ?, ?);
 func (r *Database) CreateMany(bms []Bookmark) {
 	for _, bm := range bms {
 		log.Println("Creating ", bm.URL)
-		_, err := r.Create(bm)
+		_, err := r.CreateOrGet(bm)
 		if err != nil {
 			log.Fatal("Error creating bookmark:", err)
 			return
