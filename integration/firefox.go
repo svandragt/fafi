@@ -52,6 +52,7 @@ func (r *Database) SelectMozBookmarks() ([]bookmark.Bookmark, error) {
     ORDER BY 
         dateAdded
 `
+	// TODO: only load bookmarks added since last check, save state in database table, and retrieve it here.
 	rows, err = r.db.Query(query, 100000)
 
 	if err != nil {

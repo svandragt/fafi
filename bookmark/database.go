@@ -156,7 +156,6 @@ func (r *Database) All(keywords string) ([]Bookmark, error) {
 }
 
 func (r *Database) SelectQueue() ([]Bookmark, error) {
-	// TODO random can be removed when we do not select old broken links
 	rows, err := r.db.Query("SELECT * FROM bookmarks where isScraped is null ORDER BY RANDOM()")
 	if err != nil {
 		return nil, err
