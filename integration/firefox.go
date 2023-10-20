@@ -5,12 +5,19 @@ import (
 	"fafi2/bookmark"
 	"fafi2/sander"
 	"log"
+	"os"
 	"time"
 )
 
 func ImportFirefoxProfile(path string) {
 	log.Println("Using " + path)
 	tmpFile, _ := sander.CopyToTmp(path, "fafi-firefox-*.sqlite3")
+	defer func(tmpFile **os.File) {
+		tmpPath := (*tmpFile).Name()
+		log.Println("Deleting tmpfile:", tmpPath)
+		_ = os.Remove(tmpPath)
+	}(tmpFile)
+
 	var db, err = sql.Open("sqlite3", "file:"+(*tmpFile).Name())
 	if err != nil {
 		log.Fatal("DB Opening error:", err)
