@@ -36,13 +36,15 @@ func main() {
 		}
 
 		enableIndexing := os.Getenv("FAFI_ENABLE_INDEXING")
-		if enableIndexing != "0" {
+		if enableIndexing == "0" {
+			log.Println("ENV: Indexing skipped")
+		} else {
 			bootIndexer()
 		}
+		log.Println("Ready")
 	}()
 
 	bootServer()
-	log.Println("Ready")
 }
 
 // Index any bookmarks without text
@@ -100,9 +102,10 @@ func bootDatabase() *sql.DB {
 
 	bookmark.BmDb = bookmark.NewDatabase(db)
 
-	if err := bookmark.BmDb.Migrate(); err != nil {
+	if err := bookmark.BmDb.CreateTable(); err != nil {
 		log.Fatal("Migration error:", err)
 	}
+	bookmark.CreateSampleBookmarks(bookmark.BmDb)
 
 	return db
 }

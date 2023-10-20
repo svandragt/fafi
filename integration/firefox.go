@@ -42,18 +42,19 @@ func (r *Database) SelectMozBookmarks() ([]bookmark.Bookmark, error) {
 	var err error
 	var rows *sql.Rows
 
+	log.Println("Quering for new Firefox bookmarks...")
 	query := `
     SELECT DISTINCT
         url, moz_places.title, dateAdded from moz_places  
     JOIN 
         moz_bookmarks on moz_bookmarks.fk=moz_places.id 
     WHERE 
-        moz_places.url like 'http%' and dateAdded > ?
+        moz_places.url like 'http%' and dateAdded >= ?
     ORDER BY 
         dateAdded
 `
-	// TODO: only load bookmarks added since last check, save state in database table, and retrieve it here.
-	rows, err = r.db.Query(query, 100000)
+	lastDateAddedMicro := bookmark.BmDb.GetLastDateAddedMicro()
+	rows, err = r.db.Query(query, lastDateAddedMicro)
 
 	if err != nil {
 		return nil, err
@@ -80,5 +81,6 @@ func (r *Database) SelectMozBookmarks() ([]bookmark.Bookmark, error) {
 		bms = append(bms, bm)
 	}
 
+	log.Printf("Found %d new Firefox bookmarks...\n", len(bms))
 	return bms, nil
 }

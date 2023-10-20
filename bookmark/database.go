@@ -6,7 +6,6 @@ import (
 	"fafi2/sander"
 	"github.com/mattn/go-sqlite3"
 	"log"
-	"os"
 	"time"
 )
 
@@ -27,7 +26,7 @@ func NewDatabase(db *sql.DB) *Database {
 	}
 }
 
-func (r *Database) Migrate() error {
+func (r *Database) CreateTable() error {
 	query := `
 	CREATE VIRTUAL TABLE bookmarks USING FTS5(
 	    url, 
@@ -44,24 +43,6 @@ func (r *Database) Migrate() error {
 	}
 
 	log.Println("Database created")
-
-	if os.Getenv("FAFI_SKIP_RECORDS") == "" {
-		bms := [2]Bookmark{
-			{
-				URL: "https://vandragt.com",
-			},
-			{
-				URL: "https://github.com/svandragt/fafi",
-			},
-		}
-		for _, bm := range bms {
-			_, err := r.Create(bm)
-			if err != nil {
-				log.Fatal("Create sample records error:", err)
-			}
-		}
-		log.Println("Sample records created")
-	}
 	return err
 }
 
@@ -93,6 +74,7 @@ INSERT INTO bookmarks (url, title, text, dateAdded) VALUES (?, ?, ?, ?);
 
 func (r *Database) CreateMany(bms []Bookmark) {
 	for _, bm := range bms {
+		log.Println("Creating ", bm.URL)
 		_, err := r.Create(bm)
 		if err != nil {
 			log.Fatal("Error creating bookmark:", err)
@@ -102,7 +84,7 @@ func (r *Database) CreateMany(bms []Bookmark) {
 }
 
 func (r *Database) All(keywords string) ([]Bookmark, error) {
-	query := "SELECT * FROM bookmarks ORDER BY dateAdded DESC, title LIMIT 50"
+	query := "SELECT * FROM bookmarks WHERE text is not '' ORDER BY dateAdded DESC, title LIMIT 50"
 
 	var err error
 	var rows *sql.Rows
@@ -117,6 +99,7 @@ func (r *Database) All(keywords string) ([]Bookmark, error) {
             FROM 
                 bookmarks 
             WHERE 
+                text is not '' AND
                 title MATCH ? OR
                 url MATCH ? OR
                 text MATCH ?
@@ -192,6 +175,20 @@ func (r *Database) GetByUrl(url string) (*Bookmark, error) {
 		log.Fatal("GetByUrl error:", err)
 	}
 	return &bm, nil
+}
+
+func (r *Database) GetLastDateAddedMicro() int64 {
+	row := r.db.QueryRow("SELECT dateAdded FROM bookmarks ORDER BY dateAdded DESC LIMIT 1")
+
+	var bm Bookmark
+	if err := row.Scan(&bm.DateAdded); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 100000
+		}
+		log.Fatal("GetLastDateAdded error:", err)
+	}
+	st := time.Time(bm.DateAdded)
+	return st.UnixMicro()
 }
 
 func (r *Database) Update(url string, updated Bookmark) (*Bookmark, error) {
