@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	_ "embed"
 	"fafi2/bookmark"
 	"fafi2/integration"
 	"fafi2/sander"
@@ -14,10 +15,13 @@ import (
 	"path/filepath"
 )
 
-type PageData struct {
+type TemplateData struct {
 	Bookmarks []bookmark.Bookmark
 	Query     string
 }
+
+//go:embed pub/index.html
+var EmbedHtmlIndex string
 
 func main() {
 	bootEnvironment()
@@ -122,10 +126,9 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		log.Fatal("Bookmark error:", err)
 	}
 
-	// TODO: embed templates
-	var tpl = template.Must(template.ParseFiles("pub/index.html"))
+	var tpl = template.Must(template.New("EmbedHtmlIndex").Parse(EmbedHtmlIndex))
 
-	data := PageData{
+	data := TemplateData{
 		Bookmarks: bookmarks,
 		Query:     keywords,
 	}
