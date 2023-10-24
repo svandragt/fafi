@@ -49,7 +49,6 @@ func (r *Database) SelectMozBookmarks() ([]bookmark.Bookmark, error) {
 	var err error
 	var rows *sql.Rows
 
-	log.Println("Querying for new Firefox bookmarks")
 	query := `
     SELECT DISTINCT
         url, moz_places.title, dateAdded from moz_places  

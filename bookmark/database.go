@@ -134,7 +134,7 @@ func (r *Database) All(keywords string) ([]Bookmark, error) {
 
 	log.Println(
 		len(all),
-		sander.Pluralize("result", len(all))+".",
+		sander.Pluralize("result", len(all)),
 	)
 
 	return all, nil
