@@ -20,25 +20,25 @@ type PageData struct {
 }
 
 func main() {
-	args := sander.ParseArguments()
 	bootEnvironment()
+	sander.UpdateDebugState()
 	db := bootDatabase()
 	defer func(db *sql.DB) {
 		_ = db.Close()
 	}(db)
 
 	// Check if --firefox argument was present
-	firefoxProfilePath, firefoxPresent := args["firefox"]
+	firefoxProfilePath := sander.GetArgFromEnvWithDefault("FAFI_FIREFOX", "")
 
 	go func() {
-		if firefoxPresent {
+		if firefoxProfilePath != "" {
 			integration.ImportFirefoxProfile(firefoxProfilePath)
 		}
-		enableIndexing := sander.GetEnv("FAFI_ENABLE_INDEXING", "")
-		if enableIndexing != "0" {
+		enableIndexing := sander.GetArgFromEnvWithDefault("FAFI_ENABLE_INDEXING", "1")
+		if enableIndexing == "1" {
 			bootIndexer()
 		} else {
-			log.Println("ENV: Indexing skipped")
+			log.Println("Indexing skipped")
 		}
 		log.Println("Ready")
 	}()
@@ -69,7 +69,7 @@ func bootIndexer() {
 
 // bootServer Starts Web Server
 func bootServer() {
-	port := sander.GetEnv("FAFI_PORT", "8000")
+	port := sander.GetArgFromEnvWithDefault("FAFI_PORT", "8000")
 
 	http.HandleFunc("/", handleIndex)
 
@@ -82,7 +82,8 @@ func bootServer() {
 
 // Database access
 func bootDatabase() *sql.DB {
-	fn := filepath.Clean(sander.GetEnv("FAFI_DB_FILEPATH", "fafi.sqlite3"))
+	dbPath := sander.GetArgFromEnvWithDefault("FAFI_DB_FILEPATH", "fafi.sqlite3")
+	fn := filepath.Clean(dbPath)
 	log.Println("Using " + fn)
 	db, err := sql.Open("sqlite3", "file:"+fn)
 	if err != nil {

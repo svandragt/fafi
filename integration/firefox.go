@@ -49,7 +49,7 @@ func (r *Database) SelectMozBookmarks() ([]bookmark.Bookmark, error) {
 	var err error
 	var rows *sql.Rows
 
-	log.Println("Quering for new Firefox bookmarks...")
+	log.Println("Querying for new Firefox bookmarks")
 	query := `
     SELECT DISTINCT
         url, moz_places.title, dateAdded from moz_places  
@@ -88,6 +88,6 @@ func (r *Database) SelectMozBookmarks() ([]bookmark.Bookmark, error) {
 		bms = append(bms, bm)
 	}
 
-	log.Printf("Found %d new Firefox bookmarks...\n", len(bms))
+	log.Printf("Found %d new Firefox bookmarks\n", len(bms))
 	return bms, nil
 }

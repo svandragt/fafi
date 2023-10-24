@@ -52,7 +52,7 @@ func Index(bm Bookmark) {
 }
 
 func CreateSampleBookmarks(r *Database) {
-	skipRecords := sander.GetEnv("FAFI_SKIP_RECORDS", "0")
+	skipRecords := sander.GetArgFromEnvWithDefault("FAFI_SKIP_RECORDS", "0")
 	if skipRecords == "0" {
 		bms := [2]Bookmark{
 			{
