@@ -29,10 +29,13 @@ func Index(bm Bookmark) {
 		_, _ = bmDb.Update(sourceUrl, bm)
 		return
 	}
-	if article.Title != "" {
-		bm.Title = article.Title
-	} else {
-		bm.Title = article.FinalURL
+	if bm.Title == "" {
+
+		if article.Title != "" {
+			bm.Title = article.Title
+		} else {
+			bm.Title = article.FinalURL
+		}
 	}
 	if bm.Text == "" {
 		// heuristic to filter out bookmarks to files
