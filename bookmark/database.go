@@ -74,7 +74,6 @@ INSERT INTO bookmarks (url, title, text, dateAdded) VALUES (?, ?, ?, ?);
 
 func (r *Database) CreateMany(bms []Bookmark) {
 	for _, bm := range bms {
-		log.Println("Creating ", bm.URL)
 		_, err := r.CreateOrGet(bm)
 		if err != nil {
 			log.Fatal("Error creating bookmark:", err)
