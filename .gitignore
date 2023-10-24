@@ -25,3 +25,4 @@ go.work
 /.idea
 /tmp/
 *.sqlite3-journal
+/BUILDS/
