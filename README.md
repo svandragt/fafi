@@ -4,6 +4,11 @@ Web content indexing and search tool
 * Aim of the rewrite in GO is to have a single binary that starts a webserver which can be started via systemd and queried via firefox.
 * On launch it will index any missing bookmarks (in a background process)
 
+This is how it looks:
+
+![image](https://github.com/svandragt/fafi/assets/594871/c7f9a06c-fa2a-430b-a9be-2bc66b0615d3)
+
+
 ## Environment variables
 
 ```env
