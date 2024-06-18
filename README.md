@@ -31,3 +31,13 @@ FAFI_FIREFOX=/home/san.../32kuswpy.default-release/places.sqlite
 ## Command-line arguments
 
 Each of the environment variables are available as a longform command-line argument by discarding `FAFI_` and lower-casing the result, replacing underscores with dashes. For example `FAFI_ENABLE_INDEXING=0` and `--enable-indexing=0` are equivalent.
+
+
+## Build and run
+
+```shell
+# build with full-text search
+$ go build --tags fts5 -o tmp/fafi2 fafi2 
+# run, eg indexing your Firefox places database
+$ tmp/fafi2 --firefox=/path/to/firefox/profile/places.sqlite
+```
