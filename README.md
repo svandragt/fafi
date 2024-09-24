@@ -27,7 +27,7 @@ FAFI_SKIP_RECORDS=0
 # Set to 0 to disable indexing on startup
 FAFI_ENABLE_INDEXING=1
 # Default database path:
-FAFI_DB_FILEPATH=~/fafi.sqlite3
+FAFI_DB_FILEPATH=/home/user/fafi.sqlite3
 
 # Enable importing bookmarks from Firefox profile db:
 FAFI_FIREFOX=/home/san.../32kuswpy.default-release/places.sqlite
