@@ -17,6 +17,8 @@ This is how it looks:
 
 ## Environment variables
 
+If the working directory contains a `.env` file, then the following configuration can be declared:
+
 ```env
 # Defaults are below:
 
