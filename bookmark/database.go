@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fafi2/sander"
 	"github.com/mattn/go-sqlite3"
+	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"time"
 )
@@ -47,8 +48,7 @@ func (r *Database) CreateTable() error {
 }
 
 func (r *Database) CreateOrGet(bm Bookmark) (*Bookmark, error) {
-
-	existingBookmark, err := BmDb.GetByUrl(bm.URL)
+	existingBookmark, err := r.GetByUrl(bm.URL)
 	if existingBookmark != nil {
 		return existingBookmark, err
 	}
@@ -59,9 +59,8 @@ INSERT INTO bookmarks (url, title, text, dateAdded) VALUES (?, ?, ?, ?);
 `
 	_, err = r.db.Exec(query, bm.URL, bm.Title, bm.Text, bm.DateAdded.String())
 	if err != nil {
-		var sqliteErr sqlite3.Error
-		if errors.As(err, &sqliteErr) {
-			if errors.Is(sqliteErr.ExtendedCode, sqlite3.ErrConstraintUnique) {
+		if sqliteErr, ok := err.(sqlite3.Error); ok {
+			if sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique {
 				return nil, ErrDuplicate
 			}
 		}

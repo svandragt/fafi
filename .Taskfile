@@ -1,0 +1,14 @@
+build() {
+
+	# Determine the output path
+	output_path=$(which fafi 2>/dev/null)
+	if [ -z "$output_path" ]; then
+	    output_path="dist/fafi"
+	fi
+
+	echo "Building to $output_path"
+
+	# Build the Go application
+	go build --tags 'fts5' -o "$output_path" .
+
+}
