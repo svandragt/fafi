@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"sync"
 )
 
 type TemplateData struct {
@@ -59,14 +60,24 @@ func bootIndexer() {
 			log.Println("Queue init error:", err)
 			return
 		}
+
+		var wg sync.WaitGroup
+
 		for _, bm := range queue {
-			bookmark.Index(bm)
-			if err != nil {
-				log.Println("Indexer error:", err)
-				continue
-			}
-			log.Println("Indexed " + bm.URL)
+			wg.Add(1)
+			go func(bm bookmark.Bookmark) {
+				defer wg.Done()
+				bookmark.Index(bm)
+				if err != nil {
+					log.Println("Indexer error:", err)
+					return
+				}
+				log.Println("Indexed " + bm.URL)
+			}(bm)
 		}
+
+		wg.Wait()
+		// Sleep or a condition to break out of the loop can be added here
 		return
 	}
 }
