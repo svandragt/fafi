@@ -1,5 +1,11 @@
 # fafi
-Web content indexing and search tool
+Web content indexing and search tool.
+
+1. Easily index your browser bookmarks: importing list of files, a live Firefox profile, and individual URLs
+2. Store the readability content of each bookmark
+3. Full text search matching the title and contents of the collection.
+
+On the latest incarnation:
 
 * Aim of the rewrite in GO is to have a single binary that starts a webserver which can be started via systemd and queried via firefox.
 * On launch it will index any missing bookmarks (in a background process)
@@ -11,6 +17,8 @@ This is how it looks:
 
 ## Environment variables
 
+If the working directory contains a `.env` file, then the following configuration can be declared:
+
 ```env
 # Defaults are below:
 
@@ -21,7 +29,7 @@ FAFI_SKIP_RECORDS=0
 # Set to 0 to disable indexing on startup
 FAFI_ENABLE_INDEXING=1
 # Default database path:
-FAFI_DB_FILEPATH=fafi.sqlite3
+FAFI_DB_FILEPATH=/home/user/fafi.sqlite3
 
 # Enable importing bookmarks from Firefox profile db:
 FAFI_FIREFOX=/home/san.../32kuswpy.default-release/places.sqlite
