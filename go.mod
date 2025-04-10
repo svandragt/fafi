@@ -1,6 +1,8 @@
 module fafi2
 
-go 1.18
+go 1.23.0
+
+toolchain go1.24.1
 
 require (
 	github.com/advancedlogic/GoOse v0.0.0-20230923151002-b0edce1b52f8
