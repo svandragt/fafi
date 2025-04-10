@@ -12,45 +12,15 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version:
-          - ${{ steps.go-version.outputs.go-version }}
-          - ${{ steps.go-version-prev.outputs.go-version }}
+        go-version: [1.24, 1]
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Set up Go ${{ matrix.go-version }}
       uses: actions/setup-go@v3
       with:
         go-version: ${{ matrix.go-version }}
-
-    - name: Get latest Go version
-      id: go-version
-      uses: actions/github-script@v6
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          const response = await github.rest.repos.getReleaseByTag({
-            owner: 'golang',
-            repo: 'go',
-            tag: 'go1'
-          });
-          return response.data.tag_name;
-
-    - name: Get previous Go version
-      id: go-version-prev
-      uses: actions/github-script@v6
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          const response = await github.rest.repos.getReleaseByTag({
-            owner: 'golang',
-            repo: 'go',
-            tag: 'go1'
-          });
-          const version = response.data.tag_name;
-          const [major, minor] = version.split('.').map(Number);
-          return `go${major}.${minor - 1}`;
 
     - name: Cache Go modules
       uses: actions/cache@v3
