@@ -1,0 +1,60 @@
+name: Go Build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ['stable']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go ${{ matrix.go-version }}
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Lint
+      uses: golangci/golangci-lint-action@v7
+      with:
+        version: v2.0
+
+    - name: Test
+      run: go test -v ./...
+
+    - name: Build
+      env:
+        MY_ENV_VAR: ${{ secrets.MY_ENV_VAR }}
+      run: |
+        go build --tags fts5 -o tmp/fafi2 fafi2
+
+    - name: Test Build
+      run: |
+        if [ -f tmp/fafi2 ]; then
+          echo "Build succeeded"
+        else
+          echo "Build failed"
+          exit 1
+        fi
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: fafi2-${{ matrix.go-version }}
+        path: tmp/fafi2
