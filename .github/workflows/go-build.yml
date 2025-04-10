@@ -1,4 +1,4 @@
-name: CI
+name: Go Build
 
 on:
   push:
@@ -10,16 +10,65 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version:
+          - ${{ steps.go-version.outputs.go-version }}
+          - ${{ steps.go-version-prev.outputs.go-version }}
 
     steps:
     - uses: actions/checkout@v3
 
-    - name: Set up Go
+    - name: Set up Go ${{ matrix.go-version }}
       uses: actions/setup-go@v3
       with:
-        go-version: 1.19
+        go-version: ${{ matrix.go-version }}
+
+    - name: Get latest Go version
+      id: go-version
+      uses: actions/github-script@v6
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const response = await github.rest.repos.getReleaseByTag({
+            owner: 'golang',
+            repo: 'go',
+            tag: 'go1'
+          });
+          return response.data.tag_name;
+
+    - name: Get previous Go version
+      id: go-version-prev
+      uses: actions/github-script@v6
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const response = await github.rest.repos.getReleaseByTag({
+            owner: 'golang',
+            repo: 'go',
+            tag: 'go1'
+          });
+          const version = response.data.tag_name;
+          const [major, minor] = version.split('.').map(Number);
+          return `go${major}.${minor - 1}`;
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Lint
+      run: golangci-lint run
+
+    - name: Test
+      run: go test -v ./...
 
     - name: Build
+      env:
+        MY_ENV_VAR: ${{ secrets.MY_ENV_VAR }}
       run: |
         go build --tags fts5 -o tmp/fafi2 fafi2
 
@@ -31,3 +80,9 @@ jobs:
           echo "Build failed"
           exit 1
         fi
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: fafi2-${{ matrix.go-version }}
+        path: tmp/fafi2
