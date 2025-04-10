@@ -5,7 +5,7 @@ Web content indexing and search tool.
 2. Store the readability content of each bookmark
 3. Full text search matching the title and contents of the collection.
 
-On the latest incarnation:
+In the latest incarnation:
 
 * Aim of the rewrite in GO is to have a single binary that starts a webserver which can be started via systemd and queried via firefox.
 * On launch it will index any missing bookmarks (in a background process)
