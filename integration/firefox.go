@@ -55,12 +55,11 @@ func (r *Database) SelectMozBookmarks() ([]bookmark.Bookmark, error) {
     JOIN 
         moz_bookmarks on moz_bookmarks.fk=moz_places.id 
     WHERE 
-        moz_places.url like 'http%' and dateAdded >= ?
+        moz_places.url like 'http%'
     ORDER BY 
         dateAdded
 `
-	lastDateAddedMicro := bookmark.BmDb.GetLastDateAddedMicro()
-	rows, err = r.db.Query(query, lastDateAddedMicro)
+	rows, err = r.db.Query(query)
 
 	if err != nil {
 		return nil, err
