@@ -50,14 +50,20 @@ func (r *Database) SelectMozBookmarks() ([]bookmark.Bookmark, error) {
 	var rows *sql.Rows
 
 	query := `
-    SELECT DISTINCT
-        url, moz_places.title, dateAdded from moz_places  
-    JOIN 
-        moz_bookmarks on moz_bookmarks.fk=moz_places.id 
-    WHERE 
-        moz_places.url like 'http%'
-    ORDER BY 
-        dateAdded
+WITH RECURSIVE unfiled(id) AS (
+  SELECT folder_id FROM moz_bookmarks_roots WHERE root_name='unfiled'
+  UNION ALL
+  SELECT b.id FROM moz_bookmarks b JOIN unfiled u ON b.parent = u.id
+)
+SELECT DISTINCT
+  url, moz_places.title, moz_bookmarks.dateAdded
+FROM moz_places
+JOIN moz_bookmarks ON moz_bookmarks.fk = moz_places.id
+WHERE
+  moz_places.url LIKE 'http%'
+  AND moz_bookmarks.id NOT IN (SELECT id FROM unfiled)
+ORDER BY
+  moz_bookmarks.dateAdded
 `
 	rows, err = r.db.Query(query)
 
