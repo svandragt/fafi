@@ -3,3 +3,10 @@ run:
   go: "1.24"
   build-tags:
     - fts5
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
