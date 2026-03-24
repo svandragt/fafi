@@ -10,10 +10,8 @@ linters:
     - govet
     - ineffassign
     - staticcheck
-linters-settings:
-  staticcheck:
-    checks:
-      - "SA*"  # safety-critical: bugs, correctness
-      - "S1*"  # simplifications
-issues:
-  exclude-dirs-use-default: true  # skip vendor/, testdata/, generated code
+  settings:
+    staticcheck:
+      checks:
+        - "SA*"  # safety-critical: bugs, correctness
+        - "S1*"  # simplifications
