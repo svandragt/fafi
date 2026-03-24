@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"sync"
 )
 
 type TemplateData struct {
@@ -50,6 +51,19 @@ func main() {
 	bootServer()
 }
 
+// indexQueue runs indexFn concurrently for each bookmark in queue.
+func indexQueue(queue []bookmark.Bookmark, indexFn func(bookmark.Bookmark)) {
+	var wg sync.WaitGroup
+	for _, bm := range queue {
+		wg.Add(1)
+		go func(bm bookmark.Bookmark) {
+			defer wg.Done()
+			indexFn(bm)
+		}(bm)
+	}
+	wg.Wait()
+}
+
 // Index any bookmarks without text
 func bootIndexer() {
 	for {
@@ -59,14 +73,10 @@ func bootIndexer() {
 			log.Println("Queue init error:", err)
 			return
 		}
-		for _, bm := range queue {
+		indexQueue(queue, func(bm bookmark.Bookmark) {
 			bookmark.Index(bm)
-			if err != nil {
-				log.Println("Indexer error:", err)
-				continue
-			}
 			log.Println("Indexed " + bm.URL)
-		}
+		})
 		return
 	}
 }
