@@ -23,7 +23,15 @@ Always run with `-race` to catch data races. Follow **red-green TDD**: write the
 GOTOOLCHAIN=local golangci-lint run
 ```
 
-**Always check lint passes before pushing.** A pre-push hook enforces this automatically (see `~/.claude/settings.json`).
+**Always check lint passes before pushing.**
+
+A git pre-push hook is committed in `.githooks/pre-push`. Activate it once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+A Claude Code hook also enforces this automatically on `git push` (see `~/.claude/settings.json`).
 
 Configuration is in `.golangci.yml`:
 - `run.go: "1.24"` — targets Go 1.24 semantics; prevents false typecheck errors from Go stdlib files with `//go:build go1.26` constraints
