@@ -49,3 +49,7 @@ $ go build --tags fts5 -o tmp/fafi2 fafi2
 # run, eg indexing your Firefox places database
 $ tmp/fafi2 --firefox=/path/to/firefox/profile/places.sqlite
 ```
+
+## Links
+
+[![Hypercommit](https://img.shields.io/badge/Hypercommit-DB2475)](https://hypercommit.com/fafi)
