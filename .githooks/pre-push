@@ -1,0 +1,6 @@
+#!/bin/sh
+# Run golangci-lint before every push. Install with:
+#   git config core.hooksPath .githooks
+set -e
+echo "Running golangci-lint..."
+GOTOOLCHAIN=local golangci-lint run
