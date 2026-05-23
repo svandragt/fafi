@@ -11,28 +11,32 @@ import (
 
 func ImportFirefoxProfile(path string) {
 	log.Println("Using " + path)
-	tmpFile, _ := sander.CopyToTmp(path, "fafi-firefox-*.sqlite3")
+	tmpFile, err := sander.CopyToTmp(path, "fafi-firefox-*.sqlite3")
+	if err != nil {
+		log.Println("Firefox import skipped, copy failed:", err)
+		return
+	}
 	defer func(tmpFile **os.File) {
 		tmpPath := (*tmpFile).Name()
 		log.Println("Deleting tmpfile:", tmpPath)
 		_ = os.Remove(tmpPath)
 	}(tmpFile)
 
-	var db, err = sql.Open("sqlite3", "file:"+(*tmpFile).Name())
+	db, err := sql.Open("sqlite3", "file:"+(*tmpFile).Name())
 	if err != nil {
-		log.Fatal("DB Opening error:", err)
+		log.Println("Firefox import skipped, DB open failed:", err)
+		return
 	}
 
 	ffDb := NewDatabase(db)
 
-	//Bookmarks
 	bookmarks, err := ffDb.SelectMozBookmarks()
 	if err != nil {
-		log.Fatal("SelectMozBookmarks error:", err)
+		log.Println("Firefox import skipped, SelectMozBookmarks failed:", err)
+		return
 	}
 
 	bookmark.BmDb.CreateMany(bookmarks)
-
 }
 
 type Database struct {
@@ -51,7 +55,7 @@ func (r *Database) SelectMozBookmarks() ([]bookmark.Bookmark, error) {
 
 	query := `
 WITH RECURSIVE unfiled(id) AS (
-  SELECT folder_id FROM moz_bookmarks_roots WHERE root_name='unfiled'
+  SELECT id FROM moz_bookmarks WHERE guid='unfiled_____'
   UNION ALL
   SELECT b.id FROM moz_bookmarks b JOIN unfiled u ON b.parent = u.id
 )
