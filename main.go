@@ -44,6 +44,13 @@ func main() {
 		if firefoxProfilePath != "" {
 			integration.ImportFirefoxProfile(firefoxProfilePath)
 		}
+		if sander.GetArgFromEnvWithDefault("FAFI_RESET_INDEX", "0") == "1" {
+			if err := bookmark.BmDb.ResetIndex(); err != nil {
+				log.Println("ResetIndex error:", err)
+			} else {
+				log.Println("Indexed state cleared on all bookmarks")
+			}
+		}
 		enableIndexing := sander.GetArgFromEnvWithDefault("FAFI_ENABLE_INDEXING", "1")
 		if enableIndexing == "1" {
 			bootIndexer()

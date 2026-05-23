@@ -141,6 +141,13 @@ func (r *Database) All(keywords string) ([]Bookmark, error) {
 	return all, nil
 }
 
+// ResetIndex clears the isScraped flag on every row so the indexer
+// re-processes them on the next run.
+func (r *Database) ResetIndex() error {
+	_, err := r.db.Exec("UPDATE bookmarks SET isScraped = NULL")
+	return err
+}
+
 func (r *Database) SelectQueue() ([]Bookmark, error) {
 	rows, err := r.db.Query("SELECT * FROM bookmarks where isScraped is not 1 ORDER BY RANDOM()")
 	if err != nil {

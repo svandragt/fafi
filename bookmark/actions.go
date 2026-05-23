@@ -23,10 +23,8 @@ func Index(bm Bookmark) {
 	g := goose.New()
 	article, err := g.ExtractFromURL(sourceUrl)
 	if err != nil {
-		// Avoid reindexing
+		// Leave isScraped unset so transient failures retry on next run.
 		log.Println("Indexing error:", err)
-		bm.IsScraped = sql.NullBool{Bool: true, Valid: true}
-		_, _ = bmDb.Update(sourceUrl, bm)
 		return
 	}
 	if bm.Title == "" {
