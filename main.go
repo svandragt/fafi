@@ -51,13 +51,19 @@ func main() {
 	bootServer()
 }
 
-// indexQueue runs indexFn concurrently for each bookmark in queue.
+// indexQueue runs indexFn concurrently for each bookmark in queue,
+// bounded to maxIndexConcurrency workers to avoid resource exhaustion.
+const maxIndexConcurrency = 8
+
 func indexQueue(queue []bookmark.Bookmark, indexFn func(bookmark.Bookmark)) {
+	sem := make(chan struct{}, maxIndexConcurrency)
 	var wg sync.WaitGroup
 	for _, bm := range queue {
 		wg.Add(1)
+		sem <- struct{}{}
 		go func(bm bookmark.Bookmark) {
 			defer wg.Done()
+			defer func() { <-sem }()
 			indexFn(bm)
 		}(bm)
 	}
