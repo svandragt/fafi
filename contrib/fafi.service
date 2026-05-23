@@ -1,0 +1,13 @@
+[Unit]
+Description=fafi bookmark indexer and search
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/dev/go/fafi2
+ExecStart=%h/dev/go/fafi2/tmp/fafi2 --port=9747
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target
