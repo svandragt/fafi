@@ -1,4 +1,26 @@
-# fafi development notes
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Overview
+
+fafi is a self-hosted bookmark indexer and search tool. A single Go binary starts an HTTP server, fetches readable content for each bookmark, and exposes FTS5 full-text search over titles + extracted text.
+
+## Architecture
+
+`main.go` wires three boot steps then serves HTTP:
+1. `bootEnvironment` — loads `.env` (godotenv)
+2. `bootDatabase` — opens SQLite, runs migration via `bookmark.BmDb.CreateTable`, seeds sample rows
+3. Goroutine: optional `integration.ImportFirefoxProfile` → `bootIndexer` (fetches missing content concurrently via `indexQueue`)
+4. `bootServer` — `http.ListenAndServe`, renders `pub/index.html` (embedded via `//go:embed`)
+
+Packages:
+- `bookmark/` — domain model, SQLite access (`BmDb` global), readability extraction, FTS5 queries
+- `integration/` — external sources (Firefox `places.sqlite` import)
+- `sander/` — utility helpers: env+CLI arg resolution (`GetArgFromEnvWithDefault` — CLI flag overrides env), debug state, file/string helpers
+- `pub/` — embedded HTML templates
+
+Config: every `FAFI_FOO_BAR` env var has a `--foo-bar` CLI equivalent (resolved through `sander.GetArgFromEnvWithDefault`). See README for the full list.
 
 ## Build
 
