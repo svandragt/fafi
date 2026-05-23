@@ -47,6 +47,7 @@ func (r *Database) CreateTable() error {
 }
 
 func (r *Database) CreateOrGet(bm Bookmark) (*Bookmark, error) {
+	bm.URL = NormalizeURL(bm.URL)
 
 	existingBookmark, err := BmDb.GetByUrl(bm.URL)
 	if existingBookmark != nil {
