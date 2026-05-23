@@ -58,6 +58,16 @@
             margin-top: 0.5em;
         }
 
+        #indexing-status {
+            grid-column: 1 / -1;
+            background: #fff3a3;
+            color: #333;
+            padding: 0.5em 1em;
+            border-bottom: 1px solid #e0c84a;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
     </style>
 </head>
 <body>
@@ -68,6 +78,9 @@
         <input type="submit" name="search" value="Search">
     </form>
 </header>
+<div id="indexing-status" hidden>
+    Indexing <span id="indexing-done">0</span> of <span id="indexing-total">0</span>&hellip;
+</div>
 
 <p>
     {{ if .Query }}
@@ -97,6 +110,28 @@
 
 <footer><small><em><a href="https://github.com/svandragt/fafi/">Fafi</a> -- Web content indexing and search
     tool.</em></small></footer>
+
+<script>
+    (function () {
+        const status = document.getElementById('indexing-status');
+        const doneEl = document.getElementById('indexing-done');
+        const totalEl = document.getElementById('indexing-total');
+        const es = new EventSource('/events');
+        es.onmessage = function (e) {
+            const s = JSON.parse(e.data);
+            if (s.active && s.total > 0) {
+                doneEl.textContent = s.done;
+                totalEl.textContent = s.total;
+                status.hidden = false;
+            } else {
+                status.hidden = true;
+            }
+        };
+        window.addEventListener('pagehide', function () {
+            es.close();
+        });
+    })();
+</script>
 
 </body>
 </html>

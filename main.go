@@ -3,9 +3,12 @@ package main
 import (
 	"database/sql"
 	_ "embed"
+	"encoding/json"
 	"fafi2/bookmark"
 	"fafi2/integration"
+	"fafi2/progress"
 	"fafi2/sander"
+	"fmt"
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
 	"html/template"
@@ -15,6 +18,8 @@ import (
 	"path/filepath"
 	"sync"
 )
+
+var indexProgress = progress.New()
 
 type TemplateData struct {
 	Bookmarks []bookmark.Bookmark
@@ -78,8 +83,11 @@ func bootIndexer() {
 		log.Println("Queue init error:", err)
 		return
 	}
+	indexProgress.Start(len(queue))
+	defer indexProgress.Finish()
 	indexQueue(queue, func(bm bookmark.Bookmark) {
 		bookmark.Index(bm)
+		indexProgress.Inc()
 		log.Println("Indexed " + bm.URL)
 	})
 }
@@ -89,6 +97,7 @@ func bootServer() {
 	port := sander.GetArgFromEnvWithDefault("FAFI_PORT", "8000")
 
 	http.HandleFunc("/", handleIndex)
+	http.HandleFunc("/events", handleEvents)
 
 	log.Println("Server starting on http://localhost:" + port)
 	err := http.ListenAndServe(":"+port, nil)
@@ -148,6 +157,40 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	err = tpl.Execute(w, data)
 	if err != nil {
 		log.Fatal("Error (execute):", err)
+	}
+}
+
+func handleEvents(w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	ch := indexProgress.Subscribe()
+	defer indexProgress.Unsubscribe(ch)
+
+	ctx := r.Context()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case state, ok := <-ch:
+			if !ok {
+				return
+			}
+			data, err := json.Marshal(state)
+			if err != nil {
+				return
+			}
+			if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
+				return
+			}
+			flusher.Flush()
+		}
 	}
 }
 
