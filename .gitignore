@@ -26,3 +26,4 @@ go.work
 /tmp/
 *.sqlite3-journal
 /BUILDS/
+/dist/
