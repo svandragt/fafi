@@ -16,8 +16,30 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strings"
 	"sync"
 )
+
+// contentTypeIcon returns a category icon for a MIME type, or "" for text/HTML
+// (no icon needed). Empty input also returns "" — legacy rows without a
+// detected type render plainly.
+func contentTypeIcon(ct string) string {
+	if ct == "" || strings.HasPrefix(ct, "text/") {
+		return ""
+	}
+	switch {
+	case strings.HasPrefix(ct, "image/"):
+		return "🖼"
+	case strings.HasPrefix(ct, "video/"):
+		return "🎬"
+	case strings.HasPrefix(ct, "audio/"):
+		return "🎵"
+	case ct == "application/pdf":
+		return "📄"
+	default:
+		return "📦"
+	}
+}
 
 var indexProgress = progress.New()
 
@@ -132,7 +154,7 @@ func bootDatabase() *sql.DB {
 
 	bookmark.BmDb = bookmark.NewDatabase(db)
 
-	if err := bookmark.BmDb.CreateTable(); err != nil {
+	if err := bookmark.BmDb.MigrateSchema(); err != nil {
 		log.Fatal("Migration error:", err)
 	}
 	bookmark.CreateSampleBookmarks(bookmark.BmDb)
@@ -155,7 +177,9 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		log.Fatal("Bookmark error:", err)
 	}
 
-	var tpl = template.Must(template.New("EmbedHtmlIndex").Parse(EmbedHtmlIndex))
+	var tpl = template.Must(template.New("EmbedHtmlIndex").Funcs(template.FuncMap{
+		"contentTypeIcon": contentTypeIcon,
+	}).Parse(EmbedHtmlIndex))
 
 	data := TemplateData{
 		Bookmarks: bookmarks,

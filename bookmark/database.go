@@ -6,6 +6,7 @@ import (
 	"fafi2/sander"
 	"github.com/mattn/go-sqlite3"
 	"log"
+	"strconv"
 	"time"
 )
 
@@ -16,8 +17,13 @@ var (
 	ErrDeleteFailed = errors.New("delete failed")
 )
 
+// schemaVersion is the latest schema this binary writes. Bump and add a
+// migration step in MigrateSchema when changing schema shape.
+const schemaVersion = 2
+
 type Database struct {
-	db *sql.DB
+	db      *sql.DB
+	version int
 }
 
 func NewDatabase(db *sql.DB) *Database {
@@ -26,24 +32,133 @@ func NewDatabase(db *sql.DB) *Database {
 	}
 }
 
-func (r *Database) CreateTable() error {
-	query := `
-	CREATE VIRTUAL TABLE bookmarks USING FTS5(
-	    url, 
-	    title, 
-	    text,
-	    isScraped,
-	    dateAdded
-	);
-    `
-	_, err := r.db.Exec(query)
+// MigrateSchema brings the database up to schemaVersion.
+//
+// Strategy:
+//   - empty DB (user_version=0): create v2 directly.
+//   - v1 (the original FTS5 schema + bookmark_meta sibling table): leave
+//     in place. v1 → v2 migration only runs on explicit FAFI_RESET_INDEX
+//     since it forces a full re-index (text + isScraped wiped).
+//   - v2: no-op.
+func (r *Database) MigrateSchema() error {
+	v, err := r.userVersion()
 	if err != nil {
-		log.Println("Info:", err)
-		return nil
+		return err
 	}
 
-	log.Println("Database created")
+	switch v {
+	case 0:
+		if err := r.createV2(); err != nil {
+			return err
+		}
+		if err := r.setUserVersion(2); err != nil {
+			return err
+		}
+		r.version = 2
+		log.Println("Database created (v2)")
+	case 1:
+		r.version = 1
+	case schemaVersion:
+		r.version = schemaVersion
+	default:
+		return errors.New("unknown schema version")
+	}
+	return nil
+}
+
+// Version returns the schema version currently in use.
+func (r *Database) Version() int {
+	return r.version
+}
+
+func (r *Database) userVersion() (int, error) {
+	var v int
+	if err := r.db.QueryRow("PRAGMA user_version").Scan(&v); err != nil {
+		return 0, err
+	}
+	// user_version=0 + existing bookmarks table means a legacy v1 install
+	// that predates versioning.
+	if v == 0 {
+		var name string
+		err := r.db.QueryRow(
+			"SELECT name FROM sqlite_master WHERE type='table' AND name='bookmarks'",
+		).Scan(&name)
+		if err == nil {
+			return 1, nil
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return 0, err
+		}
+	}
+	return v, nil
+}
+
+func (r *Database) setUserVersion(v int) error {
+	// PRAGMA does not accept bound parameters.
+	_, err := r.db.Exec("PRAGMA user_version = " + strconv.Itoa(v))
 	return err
+}
+
+func (r *Database) createV2() error {
+	_, err := r.db.Exec(`
+	CREATE VIRTUAL TABLE bookmarks USING FTS5(
+	    url,
+	    title,
+	    text,
+	    content_type,
+	    isScraped UNINDEXED,
+	    dateAdded UNINDEXED
+	);
+	`)
+	return err
+}
+
+// migrateToV2 rebuilds the FTS table at v2 and drops the sibling meta table.
+// Preserves url, title, dateAdded; clears text and isScraped so the indexer
+// re-fetches every bookmark (which also runs the new content-type probe).
+func (r *Database) migrateToV2() error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec(`
+	CREATE VIRTUAL TABLE bookmarks_v2 USING FTS5(
+	    url,
+	    title,
+	    text,
+	    content_type,
+	    isScraped UNINDEXED,
+	    dateAdded UNINDEXED
+	);
+	`); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(
+		`INSERT INTO bookmarks_v2 (url, title, text, content_type, dateAdded)
+		 SELECT url, title, '', '', dateAdded FROM bookmarks`,
+	); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("DROP TABLE bookmarks"); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("ALTER TABLE bookmarks_v2 RENAME TO bookmarks"); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("DROP TABLE IF EXISTS bookmark_meta"); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("PRAGMA user_version = 2"); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	r.version = 2
+	log.Println("Database migrated to v2")
+	return nil
 }
 
 func (r *Database) CreateOrGet(bm Bookmark) (*Bookmark, error) {
@@ -55,10 +170,16 @@ func (r *Database) CreateOrGet(bm Bookmark) (*Bookmark, error) {
 	}
 	bm.DateAdded = SqlTime(time.Now())
 
-	query := `
-INSERT INTO bookmarks (url, title, text, dateAdded) VALUES (?, ?, ?, ?);
-`
-	_, err = r.db.Exec(query, bm.URL, bm.Title, bm.Text, bm.DateAdded.String())
+	var query string
+	var args []any
+	if r.version >= 2 {
+		query = `INSERT INTO bookmarks (url, title, text, content_type, dateAdded) VALUES (?, ?, ?, ?, ?);`
+		args = []any{bm.URL, bm.Title, bm.Text, bm.ContentType, bm.DateAdded.String()}
+	} else {
+		query = `INSERT INTO bookmarks (url, title, text, dateAdded) VALUES (?, ?, ?, ?);`
+		args = []any{bm.URL, bm.Title, bm.Text, bm.DateAdded.String()}
+	}
+	_, err = r.db.Exec(query, args...)
 	if err != nil {
 		var sqliteErr sqlite3.Error
 		if errors.As(err, &sqliteErr) {
@@ -84,90 +205,171 @@ func (r *Database) CreateMany(bms []Bookmark) {
 }
 
 func (r *Database) All(keywords string) ([]Bookmark, error) {
-	query := "SELECT * FROM bookmarks WHERE text is not '' ORDER BY dateAdded DESC, title LIMIT 50"
+	if r.version >= 2 {
+		return r.allV2(keywords)
+	}
+	return r.allV1(keywords)
+}
 
-	var err error
+func (r *Database) allV2(keywords string) ([]Bookmark, error) {
 	var rows *sql.Rows
-	// handle search
+	var err error
 	if keywords != "" {
 		//goland:noinspection SqlSignature,SqlResolve
-		query = `
-			SELECT 
-                url, 
-                title,
-                snippet(bookmarks, 2,?,?, '...',64) as text,
-                isScraped,
-                dateAdded
-            FROM 
-                bookmarks 
-            WHERE 
-                text is not '' AND (
-                title MATCH ? OR
-                url MATCH ? OR
-                text MATCH ?
-                )
-            ORDER BY 
-                rank 
-            LIMIT ?
-`
-		rows, err = r.db.Query(query, "[", "]", keywords, keywords, keywords, 50)
+		rows, err = r.db.Query(`
+			SELECT
+				url,
+				title,
+				snippet(bookmarks, 2, ?, ?, '...', 64) as text,
+				content_type,
+				isScraped,
+				dateAdded
+			FROM bookmarks
+			WHERE text is not '' AND (
+				title MATCH ? OR
+				url MATCH ? OR
+				text MATCH ?
+			)
+			ORDER BY rank
+			LIMIT ?`,
+			"[", "]", keywords, keywords, keywords, 50,
+		)
 	} else {
-		rows, err = r.db.Query(query)
+		rows, err = r.db.Query(
+			`SELECT url, title, text, content_type, isScraped, dateAdded
+			 FROM bookmarks
+			 WHERE text is not ''
+			 ORDER BY dateAdded DESC, title
+			 LIMIT 50`,
+		)
 	}
 	if err != nil {
 		return nil, err
 	}
-	defer func(rows *sql.Rows) {
-		err := rows.Close()
-		if err != nil {
-			return
-		}
-	}(rows)
+	defer func() { _ = rows.Close() }()
 
 	var all []Bookmark
 	for rows.Next() {
 		var bm Bookmark
-		if err := rows.Scan(&bm.URL, &bm.Title, &bm.Text, &bm.IsScraped, &bm.DateAdded); err != nil {
+		var ct sql.NullString
+		if err := rows.Scan(&bm.URL, &bm.Title, &bm.Text, &ct, &bm.IsScraped, &bm.DateAdded); err != nil {
 			return nil, err
+		}
+		if ct.Valid {
+			bm.ContentType = ct.String
 		}
 		all = append(all, bm)
 	}
-
-	log.Println(
-		len(all),
-		sander.Pluralize("result", len(all)),
-	)
-
+	log.Println(len(all), sander.Pluralize("result", len(all)))
 	return all, nil
 }
 
-// ResetIndex clears the isScraped flag on every row so the indexer
-// re-processes them on the next run.
+func (r *Database) allV1(keywords string) ([]Bookmark, error) {
+	var rows *sql.Rows
+	var err error
+	if keywords != "" {
+		//goland:noinspection SqlSignature,SqlResolve
+		rows, err = r.db.Query(`
+			SELECT
+				b.url,
+				b.title,
+				snippet(bookmarks, 2, ?, ?, '...', 64) as text,
+				b.isScraped,
+				b.dateAdded,
+				m.content_type
+			FROM bookmarks b
+			LEFT JOIN bookmark_meta m ON m.url = b.url
+			WHERE b.text is not '' AND (
+				b.title MATCH ? OR
+				b.url MATCH ? OR
+				b.text MATCH ?
+			)
+			ORDER BY rank
+			LIMIT ?`,
+			"[", "]", keywords, keywords, keywords, 50,
+		)
+	} else {
+		rows, err = r.db.Query(`
+			SELECT b.url, b.title, b.text, b.isScraped, b.dateAdded, m.content_type
+			FROM bookmarks b
+			LEFT JOIN bookmark_meta m ON m.url = b.url
+			WHERE b.text is not ''
+			ORDER BY b.dateAdded DESC, b.title
+			LIMIT 50`,
+		)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var all []Bookmark
+	for rows.Next() {
+		var bm Bookmark
+		var ct sql.NullString
+		if err := rows.Scan(&bm.URL, &bm.Title, &bm.Text, &bm.IsScraped, &bm.DateAdded, &ct); err != nil {
+			return nil, err
+		}
+		if ct.Valid {
+			bm.ContentType = ct.String
+		}
+		all = append(all, bm)
+	}
+	log.Println(len(all), sander.Pluralize("result", len(all)))
+	return all, nil
+}
+
+// ResetIndex clears the isScraped flag on every row so the indexer re-processes
+// them on the next run. If the database is on an older schema, it is migrated
+// to the latest version first (which itself clears isScraped).
 func (r *Database) ResetIndex() error {
+	if r.version < schemaVersion {
+		return r.migrateToV2()
+	}
 	_, err := r.db.Exec("UPDATE bookmarks SET isScraped = NULL")
 	return err
 }
 
 func (r *Database) SelectQueue() ([]Bookmark, error) {
-	rows, err := r.db.Query("SELECT * FROM bookmarks where isScraped is not 1 ORDER BY RANDOM()")
+	var rows *sql.Rows
+	var err error
+	if r.version >= 2 {
+		rows, err = r.db.Query(
+			`SELECT url, title, text, content_type, isScraped, dateAdded
+			 FROM bookmarks WHERE isScraped is not 1 ORDER BY RANDOM()`,
+		)
+	} else {
+		rows, err = r.db.Query(
+			`SELECT url, title, text, isScraped, dateAdded FROM bookmarks
+			 WHERE isScraped is not 1 ORDER BY RANDOM()`,
+		)
+	}
 	if err != nil {
 		return nil, err
 	}
-	defer func(rows *sql.Rows) {
-		err := rows.Close()
-		if err != nil {
-			return
-		}
-	}(rows)
+	defer func() { _ = rows.Close() }()
 
 	var all []Bookmark
 	for rows.Next() {
 		var bm Bookmark
-		if err := rows.Scan(&bm.URL, &bm.Title, &bm.Text, &bm.IsScraped, &bm.DateAdded); err != nil {
-			if !bm.IsScraped.Valid {
-				return all, nil
+		if r.version >= 2 {
+			var ct sql.NullString
+			if err := rows.Scan(&bm.URL, &bm.Title, &bm.Text, &ct, &bm.IsScraped, &bm.DateAdded); err != nil {
+				if !bm.IsScraped.Valid {
+					return all, nil
+				}
+				return nil, err
 			}
-			return nil, err
+			if ct.Valid {
+				bm.ContentType = ct.String
+			}
+		} else {
+			if err := rows.Scan(&bm.URL, &bm.Title, &bm.Text, &bm.IsScraped, &bm.DateAdded); err != nil {
+				if !bm.IsScraped.Valid {
+					return all, nil
+				}
+				return nil, err
+			}
 		}
 		all = append(all, bm)
 	}
@@ -175,10 +377,29 @@ func (r *Database) SelectQueue() ([]Bookmark, error) {
 }
 
 func (r *Database) GetByUrl(url string) (*Bookmark, error) {
-	row := r.db.QueryRow("SELECT * FROM bookmarks WHERE url = ?", url)
+	var row *sql.Row
+	if r.version >= 2 {
+		row = r.db.QueryRow(
+			`SELECT url, title, text, content_type, isScraped, dateAdded
+			 FROM bookmarks WHERE url = ?`, url)
+	} else {
+		row = r.db.QueryRow(
+			`SELECT url, title, text, isScraped, dateAdded
+			 FROM bookmarks WHERE url = ?`, url)
+	}
 
 	var bm Bookmark
-	if err := row.Scan(&bm.URL, &bm.Title, &bm.Text, &bm.IsScraped, &bm.DateAdded); err != nil {
+	var err error
+	if r.version >= 2 {
+		var ct sql.NullString
+		err = row.Scan(&bm.URL, &bm.Title, &bm.Text, &ct, &bm.IsScraped, &bm.DateAdded)
+		if ct.Valid {
+			bm.ContentType = ct.String
+		}
+	} else {
+		err = row.Scan(&bm.URL, &bm.Title, &bm.Text, &bm.IsScraped, &bm.DateAdded)
+	}
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotExists
 		}
@@ -202,13 +423,29 @@ func (r *Database) GetLastDateAddedMicro() int64 {
 }
 
 func (r *Database) Update(url string, updated Bookmark) (*Bookmark, error) {
-	res, err := r.db.Exec(
-		"UPDATE bookmarks SET title = ?, text = ?, isScraped = ? WHERE url = ?",
-		updated.Title,
-		updated.Text,
-		updated.IsScraped,
-		url,
-	)
+	var res sql.Result
+	var err error
+	if r.version >= 2 {
+		res, err = r.db.Exec(
+			"UPDATE bookmarks SET title = ?, text = ?, content_type = ?, isScraped = ? WHERE url = ?",
+			updated.Title, updated.Text, updated.ContentType, updated.IsScraped, url,
+		)
+	} else {
+		res, err = r.db.Exec(
+			"UPDATE bookmarks SET title = ?, text = ?, isScraped = ? WHERE url = ?",
+			updated.Title, updated.Text, updated.IsScraped, url,
+		)
+		if err == nil && updated.ContentType != "" {
+			// v1 stores content_type in the sibling table.
+			if _, mErr := r.db.Exec(
+				`INSERT INTO bookmark_meta (url, content_type) VALUES (?, ?)
+				 ON CONFLICT(url) DO UPDATE SET content_type = excluded.content_type`,
+				url, updated.ContentType,
+			); mErr != nil {
+				log.Println("bookmark_meta upsert error:", mErr)
+			}
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -238,6 +475,10 @@ func (r *Database) Delete(url string) error {
 
 	if rowsAffected == 0 {
 		return ErrDeleteFailed
+	}
+
+	if r.version < schemaVersion {
+		_, _ = r.db.Exec("DELETE FROM bookmark_meta WHERE url = ?", url)
 	}
 
 	return err

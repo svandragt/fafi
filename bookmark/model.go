@@ -6,11 +6,12 @@ import (
 )
 
 type Bookmark struct {
-	Title     string
-	Text      string
-	URL       string
-	IsScraped sql.NullBool
-	DateAdded SqlTime
+	Title       string
+	Text        string
+	URL         string
+	ContentType string
+	IsScraped   sql.NullBool
+	DateAdded   SqlTime
 }
 
 type SqlTime time.Time

@@ -94,7 +94,7 @@
 <ol>
     {{range .Bookmarks}}
     <li>
-        <h4><a href="{{.URL}}">{{.Title}}</a></h4>
+        <h4>{{$icon := contentTypeIcon .ContentType}}{{if $icon}}<span class="ct-icon" title="{{.ContentType}}">{{$icon}}</span> {{end}}<a href="{{.URL}}">{{.Title}}</a></h4>
         <small>{{.URL}}</small>
         {{ if .Text }}
         <blockquote>{{ if ge (len .Text) 320 }}

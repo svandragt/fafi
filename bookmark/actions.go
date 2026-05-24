@@ -12,7 +12,6 @@ func Index(bm Bookmark) {
 	sourceUrl := bm.URL
 	defer func() {
 		if r := recover(); r != nil {
-			// Handle the panic here, you can log the error or take any other necessary action.
 			log.Println("Recovered from panic:", r)
 			bm.IsScraped = sql.NullBool{Bool: true, Valid: true}
 			_, _ = bmDb.Update(sourceUrl, bm)
@@ -20,15 +19,32 @@ func Index(bm Bookmark) {
 	}()
 
 	log.Println("Indexing:", sourceUrl)
+
+	ct, err := ProbeContentType(sourceUrl)
+	if err != nil {
+		log.Println("Probe error:", err)
+		// Leave isScraped unset so transient failures retry on next run.
+		return
+	}
+	bm.ContentType = ct
+
+	if !IsTextual(ct) {
+		// Non-text resource: store as a successful index, skip extraction.
+		log.Printf("Non-text (%s): %s", ct, sourceUrl)
+		bm.IsScraped = sql.NullBool{Bool: true, Valid: true}
+		if _, err := bmDb.Update(sourceUrl, bm); err != nil {
+			log.Println("Update error:", err)
+		}
+		return
+	}
+
 	g := goose.New()
 	article, err := g.ExtractFromURL(sourceUrl)
 	if err != nil {
-		// Leave isScraped unset so transient failures retry on next run.
 		log.Println("Indexing error:", err)
 		return
 	}
 	if bm.Title == "" {
-
 		if article.Title != "" {
 			bm.Title = article.Title
 		} else {
@@ -36,17 +52,12 @@ func Index(bm Bookmark) {
 		}
 	}
 	if bm.Text == "" {
-		// heuristic to filter out bookmarks to files
-		if len(article.Links) > 0 {
-			bm.Text = article.CleanedText
-		}
+		bm.Text = article.CleanedText
 	}
 	bm.URL = article.FinalURL
 	bm.IsScraped = sql.NullBool{Bool: true, Valid: true}
 
-	// Update
-	_, err = bmDb.Update(sourceUrl, bm)
-	if err != nil {
+	if _, err := bmDb.Update(sourceUrl, bm); err != nil {
 		log.Fatal("Update error:", err)
 		return
 	}
