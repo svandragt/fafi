@@ -90,7 +90,7 @@ func seedV1(t *testing.T, db *sql.DB) {
 	}
 }
 
-func TestMigrateSchema_DetectsV1AndResetIndexUpgrades(t *testing.T) {
+func TestMigrateSchema_V1AutoMigratesPreservingContent(t *testing.T) {
 	db := openTestDB(t)
 	seedV1(t, db)
 	r := NewDatabase(db)
@@ -99,16 +99,8 @@ func TestMigrateSchema_DetectsV1AndResetIndexUpgrades(t *testing.T) {
 	if err := r.MigrateSchema(); err != nil {
 		t.Fatalf("MigrateSchema: %v", err)
 	}
-	if r.Version() != 1 {
-		t.Fatalf("expected v1 detected, got %d", r.Version())
-	}
-
-	// ResetIndex on v1 should migrate all the way to the latest.
-	if err := r.ResetIndex(); err != nil {
-		t.Fatalf("ResetIndex: %v", err)
-	}
 	if r.Version() != schemaVersion {
-		t.Fatalf("after ResetIndex, version = %d, want %d", r.Version(), schemaVersion)
+		t.Fatalf("expected auto-migration to v%d, got %d", schemaVersion, r.Version())
 	}
 
 	// bookmark_meta should be gone.
@@ -128,14 +120,14 @@ func TestMigrateSchema_DetectsV1AndResetIndexUpgrades(t *testing.T) {
 	if got.Title != "A" {
 		t.Errorf("Title = %q, want A", got.Title)
 	}
-	if got.Text != "" {
-		t.Errorf("Text = %q, want empty (reindex required)", got.Text)
+	if got.Text != "body" {
+		t.Errorf("Text = %q, want preserved 'body' (no reindex)", got.Text)
 	}
-	if got.IsScraped.Valid {
-		t.Errorf("IsScraped should be NULL after migration, got %+v", got.IsScraped)
+	if !got.IsScraped.Valid || !got.IsScraped.Bool {
+		t.Errorf("IsScraped = %+v, want preserved true", got.IsScraped)
 	}
 	if got.ContentType != "" {
-		t.Errorf("ContentType = %q, want empty after migration (reprobe required)", got.ContentType)
+		t.Errorf("ContentType = %q, want empty (probe runs on next FAFI_RESET_INDEX)", got.ContentType)
 	}
 }
 
@@ -259,9 +251,10 @@ func TestMigrateV2toV3_DedupSweep(t *testing.T) {
 	}
 }
 
-func TestMigrateSchema_V1DedupesWithoutMigration(t *testing.T) {
+func TestMigrateSchema_V1WithoutBookmarkMetaTable(t *testing.T) {
+	// Real pre-versioning installs don't have bookmark_meta — make sure
+	// auto-migration still works.
 	db := openTestDB(t)
-	// Construct a v1 DB by hand (pre-versioning: no bookmark_meta).
 	if _, err := db.Exec(`CREATE VIRTUAL TABLE bookmarks USING FTS5(
 		url, title, text, isScraped, dateAdded
 	)`); err != nil {
@@ -270,13 +263,7 @@ func TestMigrateSchema_V1DedupesWithoutMigration(t *testing.T) {
 	now := time.Now().Format(time.RFC3339)
 	if _, err := db.Exec(
 		`INSERT INTO bookmarks (url, title, text, isScraped, dateAdded) VALUES (?, ?, ?, ?, ?)`,
-		"http://example.com/p", "P", "scraped via http", 1, now,
-	); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.Exec(
-		`INSERT INTO bookmarks (url, title, text, isScraped, dateAdded) VALUES (?, ?, '', NULL, ?)`,
-		"https://example.com/p", "P", now,
+		"https://example.com/x", "X", "body", 1, now,
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -286,57 +273,14 @@ func TestMigrateSchema_V1DedupesWithoutMigration(t *testing.T) {
 	if err := r.MigrateSchema(); err != nil {
 		t.Fatalf("MigrateSchema: %v", err)
 	}
-	if r.Version() != 1 {
-		t.Fatalf("expected to stay on v1, got %d", r.Version())
+	if r.Version() != schemaVersion {
+		t.Fatalf("version = %d, want %d", r.Version(), schemaVersion)
 	}
-
-	// http row should be gone.
-	if _, err := r.GetByUrl("http://example.com/p"); err == nil {
-		t.Error("http duplicate not deleted on v1")
-	}
-	// https row should have inherited the text — no reindex required.
-	got, err := r.GetByUrl("https://example.com/p")
+	got, err := r.GetByUrl("https://example.com/x")
 	if err != nil {
-		t.Fatalf("GetByUrl https: %v", err)
+		t.Fatalf("GetByUrl: %v", err)
 	}
-	if got.Text != "scraped via http" {
-		t.Errorf("https Text = %q, want %q", got.Text, "scraped via http")
-	}
-	if !got.IsScraped.Valid || !got.IsScraped.Bool {
-		t.Errorf("https IsScraped = %+v, want true", got.IsScraped)
-	}
-}
-
-func TestUpdate_V1WritesContentTypeToSiblingTable(t *testing.T) {
-	db := openTestDB(t)
-	seedV1(t, db)
-	r := NewDatabase(db)
-	withGlobalBmDb(t, r)
-	if err := r.MigrateSchema(); err != nil {
-		t.Fatal(err)
-	}
-	if r.Version() != 1 {
-		t.Fatalf("expected v1, got %d", r.Version())
-	}
-
-	updated := Bookmark{
-		Title:       "A",
-		Text:        "body",
-		ContentType: "application/pdf",
-		IsScraped:   sql.NullBool{Bool: true, Valid: true},
-	}
-	if _, err := r.Update("https://example.com/a", updated); err != nil {
-		t.Fatalf("Update: %v", err)
-	}
-
-	var ct string
-	if err := db.QueryRow(
-		"SELECT content_type FROM bookmark_meta WHERE url = ?",
-		"https://example.com/a",
-	).Scan(&ct); err != nil {
-		t.Fatalf("read meta: %v", err)
-	}
-	if ct != "application/pdf" {
-		t.Errorf("content_type = %q, want application/pdf", ct)
+	if got.Text != "body" {
+		t.Errorf("Text = %q, want preserved body", got.Text)
 	}
 }

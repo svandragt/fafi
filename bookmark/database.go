@@ -60,20 +60,12 @@ func (r *Database) MigrateSchema() error {
 		log.Printf("Database created (v%d)\n", schemaVersion)
 	case 1:
 		r.version = 1
-		// Pre-versioning installs never had bookmark_meta; create it
-		// lazily so v1 read paths can LEFT JOIN safely.
-		if _, err := r.db.Exec(
-			`CREATE TABLE IF NOT EXISTS bookmark_meta (
-				url TEXT PRIMARY KEY,
-				content_type TEXT
-			)`,
-		); err != nil {
+		// Auto-migrate forward. Safe because migrateToV2 preserves text
+		// and isScraped — no reindex required.
+		if err := r.migrateToV2(); err != nil {
 			return err
 		}
-		// Dedup http/https pairs at v1 too — no schema change needed,
-		// just row hygiene. Idempotent so it can run every boot until
-		// the install eventually migrates to the latest schema.
-		if err := r.dedupV1(); err != nil {
+		if err := r.migrateV2toV3(); err != nil {
 			return err
 		}
 	case 2:
@@ -134,81 +126,6 @@ func (r *Database) createV2() error {
 	);
 	`)
 	return err
-}
-
-// dedupV1 collapses http/https duplicates in a v1 database.
-// Operates on the legacy schema (bookmarks FTS5 + sibling bookmark_meta).
-// Idempotent — runs every boot for v1 installs.
-func (r *Database) dedupV1() error {
-	tx, err := r.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	rows, err := tx.Query(`
-		SELECT b1.url
-		FROM bookmarks b1
-		WHERE b1.url LIKE 'http://%'
-		  AND EXISTS (
-		      SELECT 1 FROM bookmarks b2
-		      WHERE b2.url = 'https://' || substr(b1.url, 8)
-		  )`)
-	if err != nil {
-		return err
-	}
-	var httpURLs []string
-	for rows.Next() {
-		var u string
-		if err := rows.Scan(&u); err != nil {
-			_ = rows.Close()
-			return err
-		}
-		httpURLs = append(httpURLs, u)
-	}
-	if err := rows.Close(); err != nil {
-		return err
-	}
-
-	for _, httpURL := range httpURLs {
-		httpsURL := "https://" + httpURL[len("http://"):]
-		// Move scraped body from http to https when the https row is empty.
-		if _, err := tx.Exec(`
-			UPDATE bookmarks
-			SET text = (SELECT text FROM bookmarks WHERE url = ?),
-			    isScraped = (SELECT isScraped FROM bookmarks WHERE url = ?)
-			WHERE url = ?
-			  AND (text IS NULL OR text = '')
-			  AND (SELECT text FROM bookmarks WHERE url = ?) IS NOT NULL
-			  AND (SELECT text FROM bookmarks WHERE url = ?) <> ''`,
-			httpURL, httpURL, httpsURL, httpURL, httpURL,
-		); err != nil {
-			return err
-		}
-		// Move content_type from http's meta row when the https one has none.
-		if _, err := tx.Exec(`
-			INSERT INTO bookmark_meta (url, content_type)
-			SELECT ?, content_type FROM bookmark_meta WHERE url = ?
-			ON CONFLICT(url) DO NOTHING`,
-			httpsURL, httpURL,
-		); err != nil {
-			return err
-		}
-		if _, err := tx.Exec("DELETE FROM bookmarks WHERE url = ?", httpURL); err != nil {
-			return err
-		}
-		if _, err := tx.Exec("DELETE FROM bookmark_meta WHERE url = ?", httpURL); err != nil {
-			return err
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return err
-	}
-	if len(httpURLs) > 0 {
-		log.Printf("Deduplicated %d http/https bookmark pair(s) on v1", len(httpURLs))
-	}
-	return nil
 }
 
 // migrateV2toV3 collapses http/https duplicates into the https variant.
@@ -305,9 +222,14 @@ func (r *Database) migrateToV2() error {
 	`); err != nil {
 		return err
 	}
+	// Preserve scraped text + isScraped so rows that have already been
+	// fetched don't need a reindex. content_type is left empty here; the
+	// indexer's probe step will populate it next time SelectQueue picks
+	// the row up (which only happens for rows that were never scraped,
+	// or after FAFI_RESET_INDEX clears isScraped).
 	if _, err := tx.Exec(
-		`INSERT INTO bookmarks_v2 (url, title, text, content_type, dateAdded)
-		 SELECT url, title, '', '', dateAdded FROM bookmarks`,
+		`INSERT INTO bookmarks_v2 (url, title, text, content_type, isScraped, dateAdded)
+		 SELECT url, title, COALESCE(text, ''), '', isScraped, dateAdded FROM bookmarks`,
 	); err != nil {
 		return err
 	}
