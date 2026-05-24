@@ -78,6 +78,7 @@ func (r *Database) MigrateSchema() error {
 	default:
 		return errors.New("unknown schema version")
 	}
+	log.Printf("Schema version: v%d", r.version)
 	return nil
 }
 
