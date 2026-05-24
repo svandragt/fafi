@@ -48,9 +48,24 @@ Each of the environment variables are available as a longform command-line argum
 
 ## Build and run
 
+The project uses [devbox](https://www.jetify.com/devbox) to pin the Go toolchain. With devbox installed:
+
 ```shell
-# build with full-text search
-$ go build --tags fts5 -o tmp/fafi2 fafi2 
-# run, eg indexing your Firefox places database
+make build              # build tmp/fafi2 (--tags fts5)
+make test               # go test -race ./...
+make run                # build and run locally
+make restart            # systemctl --user restart fafi.service
+make migrate            # build + restart (schema migrations run on startup)
+```
+
+Schema migrations run automatically on every startup — scraped content
+is preserved, so upgrading the binary and restarting the service is all
+that's needed. Use `FAFI_RESET_INDEX=1` only when you want to force a
+full re-scrape.
+
+To build without `make`:
+
+```shell
+$ devbox run -- go build --tags fts5 -o tmp/fafi2 fafi2
 $ tmp/fafi2 --firefox=/path/to/firefox/profile/places.sqlite
 ```
