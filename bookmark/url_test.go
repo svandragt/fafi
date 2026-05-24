@@ -11,6 +11,10 @@ func TestNormalizeURL(t *testing.T) {
 		{"HTTPS://VanDragt.com/foo", "https://vandragt.com/foo"},
 		{"https://example.com/page#section", "https://example.com/page"},
 		{"https://example.com/path/", "https://example.com/path/"},
+		{"  https://example.com/  ", "https://example.com/"},
+		{"https://example.com:443/", "https://example.com/"},
+		{"http://example.com:80/path", "http://example.com/path"},
+		{"https://example.com:8443/", "https://example.com:8443/"},
 	}
 	for _, c := range cases {
 		if got := NormalizeURL(c.in); got != c.want {
