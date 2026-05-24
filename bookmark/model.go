@@ -12,6 +12,7 @@ type Bookmark struct {
 	ContentType string
 	IsScraped   sql.NullBool
 	DateAdded   SqlTime
+	StatusCode  sql.NullInt64
 }
 
 type SqlTime time.Time

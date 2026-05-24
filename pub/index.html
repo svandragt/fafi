@@ -6,6 +6,16 @@
     <title>Fafi</title>
     <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
     <style>
+        body {
+            display: grid;
+            grid-template-columns: 1fr min(65rem, 90%) 1fr;
+            max-width: none;
+        }
+
+        body > * {
+            grid-column: 2;
+        }
+
         body > footer {
             padding: 0.25em;
         }
@@ -54,8 +64,127 @@
             color: grey;
         }
 
+        .pill {
+            display: inline-block;
+            padding: 0 0.4em;
+            margin-left: 0.4em;
+            font-size: 0.7rem;
+            line-height: 1.4;
+            border-radius: 10px;
+            color: white;
+            vertical-align: middle;
+            font-family: monospace;
+        }
+        .pill.s2 { background: #2e8b57; }
+        .pill.s3 { background: #4a90e2; }
+        .pill.s4 { background: #e58e26; }
+        .pill.s5 { background: #c0392b; }
+        .pill.s0 { background: #888; }
+        .pill.state-pending { background: #aaa; }
+        .pill.state-indexed { background: #6c757d; }
+
+        li .actions {
+            display: inline-block;
+            margin-left: 0.5em;
+            visibility: hidden;
+            font-size: 0.85rem;
+        }
+
+        li:hover .actions,
+        li:focus-within .actions {
+            visibility: visible;
+        }
+
+        li .actions form {
+            display: inline;
+            margin: 0;
+        }
+
+        li .actions button {
+            background: none;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            padding: 0.1em 0.5em;
+            margin: 0 0.1em;
+            font-size: 0.85rem;
+            cursor: pointer;
+            color: #555;
+        }
+
+        li .actions button:hover {
+            background: #f0f0f0;
+        }
+
+        li .actions input[type="url"] {
+            font-size: 0.85rem;
+            padding: 0.1em 0.3em;
+            width: 24em;
+        }
+
         p {
             margin-top: 0.5em;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 200px minmax(0, 1fr);
+            gap: 1.5em;
+            align-items: start;
+        }
+
+        .sidebar {
+            font-size: 0.9rem;
+            float: none;
+            max-width: none;
+            width: auto;
+            margin: 0;
+            padding: 0.5em 0.75em;
+            background: var(--accent-bg, #f5f7ff);
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        .sidebar h5 {
+            margin: 0 0 0.4em 0;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #666;
+            white-space: nowrap;
+        }
+
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 1em 0;
+        }
+
+        .sidebar li {
+            padding: 0.15em 0;
+        }
+
+        .sidebar a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .sidebar a:hover {
+            text-decoration: underline;
+        }
+
+        .sidebar a.active {
+            font-weight: bold;
+        }
+
+        .sidebar .count {
+            color: #888;
+            font-size: 0.8rem;
+            margin-left: 0.3em;
+        }
+
+        @media (max-width: 700px) {
+            .layout { grid-template-columns: 1fr; }
         }
 
         #indexing-status {
@@ -91,17 +220,41 @@
     {{ end }}
 </p>
 
+<div class="layout">
+<div class="sidebar">
+    <h5>HTTP Status</h5>
+    <ul>
+        <li><a href="{{filterURL .Query ""}}"{{if eq .Status ""}} class="active"{{end}}>All</a></li>
+        <li><a href="{{filterURL .Query "2xx"}}"{{if eq .Status "2xx"}} class="active"{{end}}><span class="pill s2">2xx</span><span class="count">{{.StatusCounts.S2xx}}</span></a></li>
+        <li><a href="{{filterURL .Query "3xx"}}"{{if eq .Status "3xx"}} class="active"{{end}}><span class="pill s3">3xx</span><span class="count">{{.StatusCounts.S3xx}}</span></a></li>
+        <li><a href="{{filterURL .Query "4xx"}}"{{if eq .Status "4xx"}} class="active"{{end}}><span class="pill s4">4xx</span><span class="count">{{.StatusCounts.S4xx}}</span></a></li>
+        <li><a href="{{filterURL .Query "5xx"}}"{{if eq .Status "5xx"}} class="active"{{end}}><span class="pill s5">5xx</span><span class="count">{{.StatusCounts.S5xx}}</span></a></li>
+        <li><a href="{{filterURL .Query "none"}}"{{if eq .Status "none"}} class="active"{{end}}><span class="pill s0">none</span><span class="count">{{.StatusCounts.None}}</span></a></li>
+    </ul>
+</div>
 <ol>
     {{range .Bookmarks}}
-    <li>
-        <h4>{{$icon := contentTypeIcon .ContentType}}{{if $icon}}<span class="ct-icon" title="{{.ContentType}}">{{$icon}}</span> {{end}}<a href="{{.URL}}">{{.Title}}</a></h4>
-        <small>{{.URL}}</small>
+    <li data-url="{{.URL}}">
+        <h4>{{$icon := contentTypeIcon .ContentType}}{{if $icon}}<span class="ct-icon" data-ct-icon title="{{.ContentType}}">{{$icon}}</span> {{end}}<a href="{{.URL}}" data-title-link>{{.Title}}</a></h4>
+        <small data-url-text>{{.URL}}</small><span data-pills>{{ if .StatusCode.Valid }}<span class="pill {{statusClass .StatusCode.Int64}}" title="HTTP status">{{.StatusCode.Int64}}</span>{{ end }}{{ if .IsScraped.Valid }}{{ if .IsScraped.Bool }}<span class="pill state-indexed">indexed</span>{{ else }}<span class="pill state-pending">pending</span>{{ end }}{{ else }}<span class="pill state-pending">pending</span>{{ end }}</span>
+        <span class="actions">
+            <form method="post" action="/reindex" data-reindex>
+                <input type="hidden" name="url" value="{{.URL}}">
+                <button type="submit" title="Re-fetch content and update title/text">Reindex</button>
+            </form>
+            <form method="post" action="/edit" onsubmit="return editPrompt(this)">
+                <input type="hidden" name="url" value="{{.URL}}">
+                <input type="hidden" name="new_url" value="">
+                <button type="submit" title="Edit URL">Edit</button>
+            </form>
+        </span>
         {{ if .Text }}
         <blockquote>{{ runeSnippet .Text 320 }}</blockquote>
         {{ end }}
     </li>
     {{end}}
 </ol>
+</div>
 
 <footer><small><em><a href="https://github.com/svandragt/fafi/">Fafi</a> -- Web content indexing and search
     tool.</em></small></footer>
@@ -126,6 +279,80 @@
             es.close();
         });
     })();
+
+    document.addEventListener('submit', function (e) {
+        const form = e.target;
+        if (!form.matches('form[data-reindex]')) return;
+        e.preventDefault();
+        const li = form.closest('li');
+        const button = form.querySelector('button');
+        const originalLabel = button.textContent;
+        button.disabled = true;
+        button.textContent = 'Reindexing…';
+        li.style.opacity = '0.6';
+
+        const body = new URLSearchParams(new FormData(form));
+        fetch(form.action, { method: 'POST', body, headers: { 'Accept': 'application/json' } })
+            .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+            .then(data => updateRow(li, data))
+            .catch(err => { alert('Reindex failed: ' + err.message); })
+            .finally(() => {
+                button.disabled = false;
+                button.textContent = originalLabel;
+                li.style.opacity = '';
+            });
+    });
+
+    function updateRow(li, data) {
+        li.dataset.url = data.url;
+        const link = li.querySelector('[data-title-link]');
+        if (link) {
+            link.href = data.url;
+            link.textContent = data.title || data.url;
+        }
+        const urlText = li.querySelector('[data-url-text]');
+        if (urlText) urlText.textContent = data.url;
+        const ctIcon = li.querySelector('[data-ct-icon]');
+        if (ctIcon) ctIcon.title = data.content_type || '';
+        // Rebuild pills.
+        const pills = li.querySelector('[data-pills]');
+        if (pills) {
+            pills.innerHTML = '';
+            if (data.has_status) {
+                pills.appendChild(makePill(statusClassFor(data.status_code), String(data.status_code), 'HTTP status'));
+            }
+            pills.appendChild(makePill(data.indexed ? 'state-indexed' : 'state-pending', data.indexed ? 'indexed' : 'pending'));
+        }
+        // Keep the per-row form's hidden url in sync so a second reindex
+        // targets the (possibly redirected) new URL.
+        li.querySelectorAll('input[name="url"]').forEach(i => { i.value = data.url; });
+    }
+
+    function makePill(cls, text, title) {
+        const el = document.createElement('span');
+        el.className = 'pill ' + cls;
+        el.textContent = text;
+        if (title) el.title = title;
+        return el;
+    }
+
+    function statusClassFor(code) {
+        if (code >= 200 && code < 300) return 's2';
+        if (code >= 300 && code < 400) return 's3';
+        if (code >= 400 && code < 500) return 's4';
+        if (code >= 500 && code < 600) return 's5';
+        return 's0';
+    }
+
+    function editPrompt(form) {
+        const current = form.elements['url'].value;
+        const next = window.prompt('Edit URL:', current);
+        if (next === null || next.trim() === '' || next === current) {
+            return false;
+        }
+        form.elements['new_url'].value = next.trim();
+        return true;
+    }
 </script>
 
 </body>

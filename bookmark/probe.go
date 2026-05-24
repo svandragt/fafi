@@ -15,54 +15,64 @@ var probeClient = &http.Client{
 	Timeout: 15 * time.Second,
 }
 
-// ProbeContentType returns the media type (e.g. "text/html", "application/pdf")
-// for the given URL, with no parameters. Empty string means unknown.
+// ProbeContentType returns the media type and HTTP status code for the given
+// URL. Empty content type means unknown; status 0 means the request never
+// reached a response (DNS failure, refused connection, timeout, etc.).
 //
 // Tries HEAD first; falls back to a ranged GET when HEAD is rejected
 // (405/501) or fails, since some servers don't implement HEAD properly.
-func ProbeContentType(url string) (string, error) {
-	if ct, err := probeHead(url); err == nil && ct != "" {
-		return ct, nil
+func ProbeContentType(url string) (string, int, error) {
+	ct, status, err := probeHead(url)
+	if err == nil && ct != "" {
+		return ct, status, nil
 	}
-	return probeGet(url)
+	ct2, status2, err2 := probeGet(url)
+	if err2 == nil {
+		return ct2, status2, nil
+	}
+	// Prefer a meaningful status from either attempt.
+	if status2 == 0 {
+		status2 = status
+	}
+	return ct2, status2, err2
 }
 
-func probeHead(url string) (string, error) {
+func probeHead(url string) (string, int, error) {
 	req, err := http.NewRequest(http.MethodHead, url, nil)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	resp, err := probeClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 400 {
-		return "", errors.New("HEAD status " + resp.Status)
+		return "", resp.StatusCode, errors.New("HEAD status " + resp.Status)
 	}
-	return mediaType(resp.Header.Get("Content-Type")), nil
+	return mediaType(resp.Header.Get("Content-Type")), resp.StatusCode, nil
 }
 
-func probeGet(url string) (string, error) {
+func probeGet(url string) (string, int, error) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	// Ask for only the first byte to avoid downloading the full body just
 	// to read headers. Servers that ignore Range still send headers first.
 	req.Header.Set("Range", "bytes=0-0")
 	resp, err := probeClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	defer func() {
 		_, _ = io.Copy(io.Discard, resp.Body)
 		_ = resp.Body.Close()
 	}()
 	if resp.StatusCode >= 400 {
-		return "", errors.New("GET status " + resp.Status)
+		return "", resp.StatusCode, errors.New("GET status " + resp.Status)
 	}
-	return mediaType(resp.Header.Get("Content-Type")), nil
+	return mediaType(resp.Header.Get("Content-Type")), resp.StatusCode, nil
 }
 
 // mediaType strips parameters from a Content-Type header value

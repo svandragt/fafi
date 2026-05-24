@@ -44,8 +44,10 @@ func contentTypeIcon(ct string) string {
 var indexProgress = progress.New()
 
 type TemplateData struct {
-	Bookmarks []bookmark.Bookmark
-	Query     string
+	Bookmarks      []bookmark.Bookmark
+	Query          string
+	Status         string
+	StatusCounts   bookmark.StatusCounts
 }
 
 //go:embed pub/index.html
@@ -61,9 +63,43 @@ func runeSnippet(s string, n int) string {
 	return string(r[:n]) + "…"
 }
 
+// statusClass maps an HTTP status code to a CSS class for the pill color.
+func statusClass(code int64) string {
+	switch {
+	case code >= 200 && code < 300:
+		return "s2"
+	case code >= 300 && code < 400:
+		return "s3"
+	case code >= 400 && code < 500:
+		return "s4"
+	case code >= 500 && code < 600:
+		return "s5"
+	default:
+		return "s0"
+	}
+}
+
+// filterURL builds the index URL preserving the current query while setting
+// (or clearing) the status filter.
+func filterURL(query, status string) string {
+	v := url.Values{}
+	if query != "" {
+		v.Set("q", query)
+	}
+	if status != "" {
+		v.Set("status", status)
+	}
+	if len(v) == 0 {
+		return "/"
+	}
+	return "/?" + v.Encode()
+}
+
 var indexTpl = template.Must(template.New("EmbedHtmlIndex").Funcs(template.FuncMap{
 	"contentTypeIcon": contentTypeIcon,
 	"runeSnippet":     runeSnippet,
+	"statusClass":     statusClass,
+	"filterURL":       filterURL,
 }).Parse(EmbedHtmlIndex))
 
 func main() {
@@ -86,6 +122,15 @@ func main() {
 				log.Println("ResetIndex error:", err)
 			} else {
 				log.Println("Indexed state cleared on all bookmarks")
+			}
+		}
+		if sander.GetArgFromEnvWithDefault("FAFI_RESET_STATUS", "0") == "1" {
+			if err := bookmark.BmDb.ClearStatuses(); err != nil {
+				log.Println("ClearStatuses error:", err)
+			} else {
+				log.Println("Status cleared; refreshing in background")
+				bookmark.RefreshAllStatuses(nil)
+				log.Println("Status refresh complete")
 			}
 		}
 		enableIndexing := sander.GetArgFromEnvWithDefault("FAFI_ENABLE_INDEXING", "1")
@@ -142,6 +187,8 @@ func bootServer() {
 
 	http.HandleFunc("/", handleIndex)
 	http.HandleFunc("/events", handleEvents)
+	http.HandleFunc("/reindex", handleReindex)
+	http.HandleFunc("/edit", handleEdit)
 
 	log.Println("Server starting on http://localhost:" + port)
 	err := http.ListenAndServe(":"+port, nil)
@@ -187,7 +234,8 @@ func bootEnvironment() {
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
 	keywords := getSearchQuery(w, r)
-	bookmarks, err := bookmark.BmDb.All(keywords)
+	statusFilter := r.URL.Query().Get("status")
+	bookmarks, err := bookmark.BmDb.AllFiltered(keywords, statusFilter)
 	if err != nil {
 		// A malformed FTS query in ?q= can cause this; don't take the
 		// server down with the request.
@@ -196,9 +244,16 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	counts, err := bookmark.BmDb.CountStatuses()
+	if err != nil {
+		log.Println("CountStatuses error:", err)
+	}
+
 	data := TemplateData{
-		Bookmarks: bookmarks,
-		Query:     keywords,
+		Bookmarks:    bookmarks,
+		Query:        keywords,
+		Status:       statusFilter,
+		StatusCounts: counts,
 	}
 	if err := indexTpl.Execute(w, data); err != nil {
 		log.Println("Template execute error:", err)
@@ -237,6 +292,82 @@ func handleEvents(w http.ResponseWriter, r *http.Request) {
 			flusher.Flush()
 		}
 	}
+}
+
+func handleReindex(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	target := r.FormValue("url")
+	if target == "" {
+		http.Error(w, "missing url", http.StatusBadRequest)
+		return
+	}
+	bm, err := bookmark.BmDb.GetByUrl(target)
+	if err != nil {
+		http.Error(w, "bookmark not found", http.StatusNotFound)
+		return
+	}
+	bookmark.Reindex(*bm)
+	// Re-fetch to capture any URL change (goose follows redirects) and the
+	// fresh fields. The row may now live at the redirected URL.
+	updated, err := bookmark.BmDb.GetByUrl(target)
+	if err != nil {
+		// URL was rewritten by the indexer; we don't currently track that
+		// in a way we can resolve here. Fall back to whatever we have.
+		updated = bm
+	}
+	statusCode := bookmark.BmDb.LookupStatus(updated.URL)
+
+	resp := struct {
+		URL         string `json:"url"`
+		Title       string `json:"title"`
+		ContentType string `json:"content_type"`
+		Indexed     bool   `json:"indexed"`
+		StatusCode  int64  `json:"status_code,omitempty"`
+		HasStatus   bool   `json:"has_status"`
+	}{
+		URL:         updated.URL,
+		Title:       updated.Title,
+		ContentType: updated.ContentType,
+		Indexed:     updated.IsScraped.Valid && updated.IsScraped.Bool,
+		HasStatus:   statusCode.Valid,
+	}
+	if statusCode.Valid {
+		resp.StatusCode = statusCode.Int64
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		log.Println("reindex json encode error:", err)
+	}
+}
+
+func handleEdit(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	oldURL := r.FormValue("url")
+	newURL := bookmark.NormalizeURL(r.FormValue("new_url"))
+	if oldURL == "" || newURL == "" {
+		http.Error(w, "missing url", http.StatusBadRequest)
+		return
+	}
+	if err := bookmark.BmDb.UpdateURL(oldURL, newURL); err != nil {
+		log.Println("UpdateURL error:", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	redirectBack(w, r)
+}
+
+func redirectBack(w http.ResponseWriter, r *http.Request) {
+	ref := r.Referer()
+	if ref == "" {
+		ref = "/"
+	}
+	http.Redirect(w, r, ref, http.StatusSeeOther)
 }
 
 func getSearchQuery(w http.ResponseWriter, r *http.Request) string {

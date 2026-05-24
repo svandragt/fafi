@@ -226,8 +226,8 @@ func TestMigrateV2toV3_DedupSweep(t *testing.T) {
 	if err := r.MigrateSchema(); err != nil {
 		t.Fatalf("MigrateSchema: %v", err)
 	}
-	if r.Version() != 3 {
-		t.Fatalf("version = %d, want 3", r.Version())
+	if r.Version() != 5 {
+		t.Fatalf("version = %d, want 5", r.Version())
 	}
 
 	// http duplicate should be gone, https should have inherited the body.

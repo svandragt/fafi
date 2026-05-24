@@ -20,7 +20,7 @@ var (
 
 // schemaVersion is the latest schema this binary writes. Bump and add a
 // migration step in MigrateSchema when changing schema shape.
-const schemaVersion = 3
+const schemaVersion = 5
 
 type Database struct {
 	db      *sql.DB
@@ -53,6 +53,9 @@ func (r *Database) MigrateSchema() error {
 		if err := r.createV2(); err != nil {
 			return err
 		}
+		if err := r.createStatusTable(); err != nil {
+			return err
+		}
 		if err := r.setUserVersion(schemaVersion); err != nil {
 			return err
 		}
@@ -68,9 +71,34 @@ func (r *Database) MigrateSchema() error {
 		if err := r.migrateV2toV3(); err != nil {
 			return err
 		}
+		if err := r.migrateV3toV4(); err != nil {
+			return err
+		}
+		if err := r.migrateV4toV5(); err != nil {
+			return err
+		}
 	case 2:
 		r.version = 2
 		if err := r.migrateV2toV3(); err != nil {
+			return err
+		}
+		if err := r.migrateV3toV4(); err != nil {
+			return err
+		}
+		if err := r.migrateV4toV5(); err != nil {
+			return err
+		}
+	case 3:
+		r.version = 3
+		if err := r.migrateV3toV4(); err != nil {
+			return err
+		}
+		if err := r.migrateV4toV5(); err != nil {
+			return err
+		}
+	case 4:
+		r.version = 4
+		if err := r.migrateV4toV5(); err != nil {
 			return err
 		}
 	case schemaVersion:
@@ -113,6 +141,116 @@ func (r *Database) setUserVersion(v int) error {
 	// PRAGMA does not accept bound parameters.
 	_, err := r.db.Exec("PRAGMA user_version = " + strconv.Itoa(v))
 	return err
+}
+
+// createStatusTable creates the sibling table that stores HTTP status codes
+// per URL. Kept outside the FTS5 table since FTS5 doesn't support ALTER TABLE.
+func (r *Database) createStatusTable() error {
+	_, err := r.db.Exec(`
+	CREATE TABLE IF NOT EXISTS bookmark_status (
+		url TEXT PRIMARY KEY,
+		status_code INTEGER,
+		last_checked TEXT
+	);
+	`)
+	return err
+}
+
+// migrateV4toV5 re-normalises every URL through the (possibly updated)
+// NormalizeURL function and merges any resulting collisions. Idempotent —
+// rows already in canonical form are left alone, and re-running is a no-op
+// once swept (the user_version bump ensures it).
+//
+// Merge rule on collision: prefer the row with non-empty text. If both have
+// text, keep the existing canonical row and drop the duplicate. The status
+// entry follows the surviving row.
+func (r *Database) migrateV4toV5() error {
+	type rename struct{ oldURL, newURL string }
+	rows, err := r.db.Query("SELECT url FROM bookmarks")
+	if err != nil {
+		return err
+	}
+	var todo []rename
+	for rows.Next() {
+		var u string
+		if err := rows.Scan(&u); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		n := NormalizeURL(u)
+		if n != u {
+			todo = append(todo, rename{u, n})
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+
+	var renamed, merged int
+	for _, t := range todo {
+		existing, _ := r.GetByUrl(t.newURL)
+		if existing == nil {
+			if _, err := r.db.Exec("UPDATE bookmarks SET url = ? WHERE url = ?", t.newURL, t.oldURL); err != nil {
+				return err
+			}
+			if _, err := r.db.Exec("UPDATE bookmark_status SET url = ? WHERE url = ?", t.newURL, t.oldURL); err != nil {
+				return err
+			}
+			renamed++
+			continue
+		}
+		// Collision: merge the old row into the canonical one.
+		old, err := r.GetByUrl(t.oldURL)
+		if err != nil {
+			return err
+		}
+		if (existing.Text == "" || !existing.IsScraped.Bool) && old.Text != "" {
+			if _, err := r.db.Exec(
+				`UPDATE bookmarks SET text = ?, content_type = ?, isScraped = ? WHERE url = ?`,
+				old.Text, old.ContentType, old.IsScraped, t.newURL,
+			); err != nil {
+				return err
+			}
+		}
+		// Move status to the canonical row only if it doesn't already have one.
+		if _, err := r.db.Exec(
+			`INSERT OR IGNORE INTO bookmark_status (url, status_code, last_checked)
+			 SELECT ?, status_code, last_checked FROM bookmark_status WHERE url = ?`,
+			t.newURL, t.oldURL,
+		); err != nil {
+			return err
+		}
+		if _, err := r.db.Exec("DELETE FROM bookmark_status WHERE url = ?", t.oldURL); err != nil {
+			return err
+		}
+		if _, err := r.db.Exec("DELETE FROM bookmarks WHERE url = ?", t.oldURL); err != nil {
+			return err
+		}
+		merged++
+	}
+	if err := r.setUserVersion(5); err != nil {
+		return err
+	}
+	r.version = 5
+	if renamed > 0 || merged > 0 {
+		log.Printf("Database migrated to v5 (%d renamed, %d merged)", renamed, merged)
+	} else {
+		log.Println("Database migrated to v5 (no changes)")
+	}
+	return nil
+}
+
+// migrateV3toV4 adds the bookmark_status sibling table.
+func (r *Database) migrateV3toV4() error {
+	if err := r.createStatusTable(); err != nil {
+		return err
+	}
+	if err := r.setUserVersion(4); err != nil {
+		return err
+	}
+	r.version = 4
+	log.Println("Database migrated to v4")
+	return nil
 }
 
 func (r *Database) createV2() error {
@@ -314,15 +452,100 @@ func (r *Database) CreateMany(bms []Bookmark) {
 }
 
 func (r *Database) All(keywords string) ([]Bookmark, error) {
+	return r.AllFiltered(keywords, "")
+}
+
+// StatusCounts holds the number of bookmarks in each HTTP status bucket plus
+// "none" for rows that have never been probed.
+type StatusCounts struct {
+	S2xx int
+	S3xx int
+	S4xx int
+	S5xx int
+	None int
+}
+
+// AllFiltered behaves like All but restricts results to a status bucket
+// ("2xx", "3xx", "4xx", "5xx", "none", or "" for no filter).
+func (r *Database) AllFiltered(keywords, statusFilter string) ([]Bookmark, error) {
 	if r.version >= 2 {
-		return r.allV2(keywords)
+		return r.allV2Filtered(keywords, statusFilter)
 	}
 	return r.allV1(keywords)
 }
 
+// CountStatuses returns a count per status bucket across all bookmarks.
+// Empty StatusCounts on schemas < v4.
+func (r *Database) CountStatuses() (StatusCounts, error) {
+	var c StatusCounts
+	if r.version < 4 {
+		return c, nil
+	}
+	rows, err := r.db.Query(`
+		SELECT
+		  CASE
+		    WHEN status_code BETWEEN 200 AND 299 THEN '2xx'
+		    WHEN status_code BETWEEN 300 AND 399 THEN '3xx'
+		    WHEN status_code BETWEEN 400 AND 499 THEN '4xx'
+		    WHEN status_code BETWEEN 500 AND 599 THEN '5xx'
+		    ELSE 'other'
+		  END AS bucket,
+		  count(*)
+		FROM bookmark_status
+		GROUP BY bucket`)
+	if err != nil {
+		return c, err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var bucket string
+		var n int
+		if err := rows.Scan(&bucket, &n); err != nil {
+			return c, err
+		}
+		switch bucket {
+		case "2xx":
+			c.S2xx = n
+		case "3xx":
+			c.S3xx = n
+		case "4xx":
+			c.S4xx = n
+		case "5xx":
+			c.S5xx = n
+		}
+	}
+	if err := r.db.QueryRow(
+		`SELECT count(*) FROM bookmarks WHERE url NOT IN (SELECT url FROM bookmark_status)`,
+	).Scan(&c.None); err != nil {
+		return c, err
+	}
+	return c, nil
+}
+
+func statusFilterClause(bucket string) (clause string, ok bool) {
+	switch bucket {
+	case "2xx":
+		return ` AND url IN (SELECT url FROM bookmark_status WHERE status_code BETWEEN 200 AND 299)`, true
+	case "3xx":
+		return ` AND url IN (SELECT url FROM bookmark_status WHERE status_code BETWEEN 300 AND 399)`, true
+	case "4xx":
+		return ` AND url IN (SELECT url FROM bookmark_status WHERE status_code BETWEEN 400 AND 499)`, true
+	case "5xx":
+		return ` AND url IN (SELECT url FROM bookmark_status WHERE status_code BETWEEN 500 AND 599)`, true
+	case "none":
+		return ` AND url NOT IN (SELECT url FROM bookmark_status)`, true
+	}
+	return "", false
+}
+
 func (r *Database) allV2(keywords string) ([]Bookmark, error) {
+	return r.allV2Filtered(keywords, "")
+}
+
+func (r *Database) allV2Filtered(keywords, statusFilter string) ([]Bookmark, error) {
 	var rows *sql.Rows
 	var err error
+	filterClause, _ := statusFilterClause(statusFilter)
 	if keywords != "" {
 		//goland:noinspection SqlSignature,SqlResolve
 		rows, err = r.db.Query(`
@@ -338,7 +561,7 @@ func (r *Database) allV2(keywords string) ([]Bookmark, error) {
 				title MATCH ? OR
 				url MATCH ? OR
 				text MATCH ?
-			)
+			)`+filterClause+`
 			ORDER BY rank
 			LIMIT ?`,
 			"[", "]", keywords, keywords, keywords, 50,
@@ -347,7 +570,7 @@ func (r *Database) allV2(keywords string) ([]Bookmark, error) {
 		rows, err = r.db.Query(
 			`SELECT url, title, text, content_type, isScraped, dateAdded
 			 FROM bookmarks
-			 WHERE text is not ''
+			 WHERE text is not ''` + filterClause + `
 			 ORDER BY dateAdded DESC, title
 			 LIMIT 50`,
 		)
@@ -369,8 +592,49 @@ func (r *Database) allV2(keywords string) ([]Bookmark, error) {
 		}
 		all = append(all, bm)
 	}
+	if err := r.attachStatuses(all); err != nil {
+		log.Println("attachStatuses error:", err)
+	}
 	log.Println(len(all), sander.Pluralize("result", len(all)))
 	return all, nil
+}
+
+// attachStatuses fills StatusCode on each bookmark from the sibling table.
+// No-op on schemas < v4.
+func (r *Database) attachStatuses(bms []Bookmark) error {
+	if r.version < 4 || len(bms) == 0 {
+		return nil
+	}
+	placeholders := make([]string, len(bms))
+	args := make([]any, len(bms))
+	for i, bm := range bms {
+		placeholders[i] = "?"
+		args[i] = bm.URL
+	}
+	rows, err := r.db.Query(
+		"SELECT url, status_code FROM bookmark_status WHERE url IN ("+strings.Join(placeholders, ",")+")",
+		args...,
+	)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+
+	byURL := make(map[string]sql.NullInt64, len(bms))
+	for rows.Next() {
+		var u string
+		var code sql.NullInt64
+		if err := rows.Scan(&u, &code); err != nil {
+			return err
+		}
+		byURL[u] = code
+	}
+	for i := range bms {
+		if code, ok := byURL[bms[i].URL]; ok {
+			bms[i].StatusCode = code
+		}
+	}
+	return nil
 }
 
 func (r *Database) allV1(keywords string) ([]Bookmark, error) {
@@ -578,6 +842,89 @@ func (r *Database) Update(url string, updated Bookmark) (*Bookmark, error) {
 	return &updated, nil
 }
 
+// AllURLs returns every bookmark URL. Used by background maintenance jobs
+// (e.g. status refresh).
+func (r *Database) AllURLs() ([]string, error) {
+	rows, err := r.db.Query("SELECT url FROM bookmarks")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []string
+	for rows.Next() {
+		var u string
+		if err := rows.Scan(&u); err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, nil
+}
+
+// ClearStatuses removes every row from bookmark_status so a refresh pass can
+// repopulate them. No-op on schema < v4.
+func (r *Database) ClearStatuses() error {
+	if r.version < 4 {
+		return nil
+	}
+	_, err := r.db.Exec("DELETE FROM bookmark_status")
+	return err
+}
+
+// LookupStatus returns the persisted HTTP status for a URL, or an invalid
+// NullInt64 if none is stored (or schema < v4).
+func (r *Database) LookupStatus(url string) sql.NullInt64 {
+	var code sql.NullInt64
+	if r.version < 4 {
+		return code
+	}
+	_ = r.db.QueryRow("SELECT status_code FROM bookmark_status WHERE url = ?", url).Scan(&code)
+	return code
+}
+
+// UpsertStatus records the latest HTTP status code seen for a URL.
+// Stored in the sibling bookmark_status table; safe no-op on schemas < v4.
+func (r *Database) UpsertStatus(url string, statusCode int) error {
+	if r.version < 4 {
+		return nil
+	}
+	_, err := r.db.Exec(
+		`INSERT INTO bookmark_status (url, status_code, last_checked) VALUES (?, ?, ?)
+		 ON CONFLICT(url) DO UPDATE SET status_code = excluded.status_code, last_checked = excluded.last_checked`,
+		url, statusCode, time.Now().UTC().Format(time.RFC3339),
+	)
+	return err
+}
+
+// UpdateURL renames a bookmark's URL in place. Returns ErrDuplicate if a row
+// with newURL already exists, ErrNotExists if oldURL is missing.
+func (r *Database) UpdateURL(oldURL, newURL string) error {
+	if oldURL == newURL {
+		return nil
+	}
+	if existing, _ := r.GetByUrl(newURL); existing != nil {
+		return ErrDuplicate
+	}
+	res, err := r.db.Exec("UPDATE bookmarks SET url = ? WHERE url = ?", newURL, oldURL)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return ErrNotExists
+	}
+	if r.version < 2 {
+		_, _ = r.db.Exec("UPDATE bookmark_meta SET url = ? WHERE url = ?", newURL, oldURL)
+	}
+	if r.version >= 4 {
+		_, _ = r.db.Exec("UPDATE bookmark_status SET url = ? WHERE url = ?", newURL, oldURL)
+	}
+	return nil
+}
+
 func (r *Database) Delete(url string) error {
 	res, err := r.db.Exec("DELETE FROM bookmarks WHERE url = ?", url)
 	if err != nil {
@@ -593,8 +940,11 @@ func (r *Database) Delete(url string) error {
 		return ErrDeleteFailed
 	}
 
-	if r.version < schemaVersion {
+	if r.version < 2 {
 		_, _ = r.db.Exec("DELETE FROM bookmark_meta WHERE url = ?", url)
+	}
+	if r.version >= 4 {
+		_, _ = r.db.Exec("DELETE FROM bookmark_status WHERE url = ?", url)
 	}
 
 	return err

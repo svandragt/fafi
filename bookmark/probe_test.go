@@ -16,7 +16,7 @@ func TestProbeContentType_HEAD(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ct, err := ProbeContentType(srv.URL)
+	ct, _, err := ProbeContentType(srv.URL)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -31,7 +31,7 @@ func TestProbeContentType_StripsParams(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ct, err := ProbeContentType(srv.URL)
+	ct, _, err := ProbeContentType(srv.URL)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestProbeContentType_HEADRejectedFallsBackToGET(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ct, err := ProbeContentType(srv.URL)
+	ct, _, err := ProbeContentType(srv.URL)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
