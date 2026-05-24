@@ -259,6 +259,54 @@ func TestMigrateV2toV3_DedupSweep(t *testing.T) {
 	}
 }
 
+func TestMigrateSchema_V1DedupesWithoutMigration(t *testing.T) {
+	db := openTestDB(t)
+	// Construct a v1 DB by hand (pre-versioning: no bookmark_meta).
+	if _, err := db.Exec(`CREATE VIRTUAL TABLE bookmarks USING FTS5(
+		url, title, text, isScraped, dateAdded
+	)`); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().Format(time.RFC3339)
+	if _, err := db.Exec(
+		`INSERT INTO bookmarks (url, title, text, isScraped, dateAdded) VALUES (?, ?, ?, ?, ?)`,
+		"http://example.com/p", "P", "scraped via http", 1, now,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(
+		`INSERT INTO bookmarks (url, title, text, isScraped, dateAdded) VALUES (?, ?, '', NULL, ?)`,
+		"https://example.com/p", "P", now,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	r := NewDatabase(db)
+	withGlobalBmDb(t, r)
+	if err := r.MigrateSchema(); err != nil {
+		t.Fatalf("MigrateSchema: %v", err)
+	}
+	if r.Version() != 1 {
+		t.Fatalf("expected to stay on v1, got %d", r.Version())
+	}
+
+	// http row should be gone.
+	if _, err := r.GetByUrl("http://example.com/p"); err == nil {
+		t.Error("http duplicate not deleted on v1")
+	}
+	// https row should have inherited the text — no reindex required.
+	got, err := r.GetByUrl("https://example.com/p")
+	if err != nil {
+		t.Fatalf("GetByUrl https: %v", err)
+	}
+	if got.Text != "scraped via http" {
+		t.Errorf("https Text = %q, want %q", got.Text, "scraped via http")
+	}
+	if !got.IsScraped.Valid || !got.IsScraped.Bool {
+		t.Errorf("https IsScraped = %+v, want true", got.IsScraped)
+	}
+}
+
 func TestUpdate_V1WritesContentTypeToSiblingTable(t *testing.T) {
 	db := openTestDB(t)
 	seedV1(t, db)

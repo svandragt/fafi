@@ -28,7 +28,7 @@ Tracked via `PRAGMA user_version`; `bookmark.schemaVersion` is the latest the bi
 - **v2**: FTS5 `bookmarks(url, title, text, content_type, isScraped UNINDEXED, dateAdded UNINDEXED)` — no sibling table. `UNINDEXED` skips tokenization for columns never used with `MATCH`.
 - **v3**: same table shape as v2; semantic-only bump asserting "no http/https scheme-only duplicates". `migrateV2toV3` collapses pairs into the https variant, moving over scraped content where the https row is empty.
 
-Migration v1 → latest only runs on `FAFI_RESET_INDEX=1` (since it forces a full re-fetch). v2 → v3 runs automatically on boot — it's a cheap idempotent sweep. Fresh databases are always created at the latest version. Read/write paths branch on `Database.version`. Future cleanup: once enough time has passed, drop v1 branches and either auto-migrate on boot or refuse to start with a clear message.
+Migration v1 → latest only runs on `FAFI_RESET_INDEX=1` (since it forces a full re-fetch). v2 → v3 runs automatically on boot — it's a cheap idempotent sweep. The http/https dedup also runs on v1 boots (`dedupV1`) so legacy installs get deduped without a reindex. Fresh databases are always created at the latest version. Read/write paths branch on `Database.version`. Future cleanup: once enough time has passed, drop v1 branches and either auto-migrate on boot or refuse to start with a clear message.
 
 Config: every `FAFI_FOO_BAR` env var has a `--foo-bar` CLI equivalent (resolved through `sander.GetArgFromEnvWithDefault`). See README for the full list.
 

@@ -70,6 +70,12 @@ func (r *Database) MigrateSchema() error {
 		); err != nil {
 			return err
 		}
+		// Dedup http/https pairs at v1 too — no schema change needed,
+		// just row hygiene. Idempotent so it can run every boot until
+		// the install eventually migrates to the latest schema.
+		if err := r.dedupV1(); err != nil {
+			return err
+		}
 	case 2:
 		r.version = 2
 		if err := r.migrateV2toV3(); err != nil {
@@ -128,6 +134,81 @@ func (r *Database) createV2() error {
 	);
 	`)
 	return err
+}
+
+// dedupV1 collapses http/https duplicates in a v1 database.
+// Operates on the legacy schema (bookmarks FTS5 + sibling bookmark_meta).
+// Idempotent — runs every boot for v1 installs.
+func (r *Database) dedupV1() error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	rows, err := tx.Query(`
+		SELECT b1.url
+		FROM bookmarks b1
+		WHERE b1.url LIKE 'http://%'
+		  AND EXISTS (
+		      SELECT 1 FROM bookmarks b2
+		      WHERE b2.url = 'https://' || substr(b1.url, 8)
+		  )`)
+	if err != nil {
+		return err
+	}
+	var httpURLs []string
+	for rows.Next() {
+		var u string
+		if err := rows.Scan(&u); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		httpURLs = append(httpURLs, u)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+
+	for _, httpURL := range httpURLs {
+		httpsURL := "https://" + httpURL[len("http://"):]
+		// Move scraped body from http to https when the https row is empty.
+		if _, err := tx.Exec(`
+			UPDATE bookmarks
+			SET text = (SELECT text FROM bookmarks WHERE url = ?),
+			    isScraped = (SELECT isScraped FROM bookmarks WHERE url = ?)
+			WHERE url = ?
+			  AND (text IS NULL OR text = '')
+			  AND (SELECT text FROM bookmarks WHERE url = ?) IS NOT NULL
+			  AND (SELECT text FROM bookmarks WHERE url = ?) <> ''`,
+			httpURL, httpURL, httpsURL, httpURL, httpURL,
+		); err != nil {
+			return err
+		}
+		// Move content_type from http's meta row when the https one has none.
+		if _, err := tx.Exec(`
+			INSERT INTO bookmark_meta (url, content_type)
+			SELECT ?, content_type FROM bookmark_meta WHERE url = ?
+			ON CONFLICT(url) DO NOTHING`,
+			httpsURL, httpURL,
+		); err != nil {
+			return err
+		}
+		if _, err := tx.Exec("DELETE FROM bookmarks WHERE url = ?", httpURL); err != nil {
+			return err
+		}
+		if _, err := tx.Exec("DELETE FROM bookmark_meta WHERE url = ?", httpURL); err != nil {
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	if len(httpURLs) > 0 {
+		log.Printf("Deduplicated %d http/https bookmark pair(s) on v1", len(httpURLs))
+	}
+	return nil
 }
 
 // migrateV2toV3 collapses http/https duplicates into the https variant.
