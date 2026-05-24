@@ -27,7 +27,7 @@ func withGlobalBmDb(t *testing.T, r *Database) {
 	t.Cleanup(func() { BmDb = prev })
 }
 
-func TestMigrateSchema_FreshDBCreatesV2(t *testing.T) {
+func TestMigrateSchema_FreshDBCreatesLatest(t *testing.T) {
 	db := openTestDB(t)
 	r := NewDatabase(db)
 	withGlobalBmDb(t, r)
@@ -35,16 +35,16 @@ func TestMigrateSchema_FreshDBCreatesV2(t *testing.T) {
 	if err := r.MigrateSchema(); err != nil {
 		t.Fatalf("MigrateSchema: %v", err)
 	}
-	if r.Version() != 2 {
-		t.Errorf("version = %d, want 2", r.Version())
+	if r.Version() != schemaVersion {
+		t.Errorf("version = %d, want %d", r.Version(), schemaVersion)
 	}
 
 	var uv int
 	if err := db.QueryRow("PRAGMA user_version").Scan(&uv); err != nil {
 		t.Fatal(err)
 	}
-	if uv != 2 {
-		t.Errorf("user_version = %d, want 2", uv)
+	if uv != schemaVersion {
+		t.Errorf("user_version = %d, want %d", uv, schemaVersion)
 	}
 
 	// Verify content_type column exists by inserting a row.
@@ -103,12 +103,12 @@ func TestMigrateSchema_DetectsV1AndResetIndexUpgrades(t *testing.T) {
 		t.Fatalf("expected v1 detected, got %d", r.Version())
 	}
 
-	// ResetIndex on v1 should migrate to v2.
+	// ResetIndex on v1 should migrate all the way to the latest.
 	if err := r.ResetIndex(); err != nil {
 		t.Fatalf("ResetIndex: %v", err)
 	}
-	if r.Version() != 2 {
-		t.Fatalf("after ResetIndex, version = %d, want 2", r.Version())
+	if r.Version() != schemaVersion {
+		t.Fatalf("after ResetIndex, version = %d, want %d", r.Version(), schemaVersion)
 	}
 
 	// bookmark_meta should be gone.
@@ -136,6 +136,126 @@ func TestMigrateSchema_DetectsV1AndResetIndexUpgrades(t *testing.T) {
 	}
 	if got.ContentType != "" {
 		t.Errorf("ContentType = %q, want empty after migration (reprobe required)", got.ContentType)
+	}
+}
+
+func TestCreateOrGet_HttpReturnsExistingHttps(t *testing.T) {
+	db := openTestDB(t)
+	r := NewDatabase(db)
+	withGlobalBmDb(t, r)
+	if err := r.MigrateSchema(); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := r.CreateOrGet(Bookmark{URL: "https://example.com/x", Title: "secure"}); err != nil {
+		t.Fatalf("seed https: %v", err)
+	}
+	got, err := r.CreateOrGet(Bookmark{URL: "http://example.com/x", Title: "insecure"})
+	if err != nil {
+		t.Fatalf("insert http: %v", err)
+	}
+	if got.URL != "https://example.com/x" {
+		t.Errorf("got URL %q, want https variant", got.URL)
+	}
+	if got.Title != "secure" {
+		t.Errorf("got Title %q, want existing https title 'secure'", got.Title)
+	}
+}
+
+func TestCreateOrGet_HttpsReplacesExistingHttp(t *testing.T) {
+	db := openTestDB(t)
+	r := NewDatabase(db)
+	withGlobalBmDb(t, r)
+	if err := r.MigrateSchema(); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := r.CreateOrGet(Bookmark{URL: "http://example.com/y", Title: "old"}); err != nil {
+		t.Fatalf("seed http: %v", err)
+	}
+	if _, err := r.CreateOrGet(Bookmark{URL: "https://example.com/y", Title: "new"}); err != nil {
+		t.Fatalf("insert https: %v", err)
+	}
+
+	// http row must be gone, https row must be the live one.
+	if _, err := r.GetByUrl("http://example.com/y"); err == nil {
+		t.Error("http row still exists after https insert")
+	}
+	got, err := r.GetByUrl("https://example.com/y")
+	if err != nil {
+		t.Fatalf("GetByUrl https: %v", err)
+	}
+	if got.Title != "new" {
+		t.Errorf("got Title %q, want new", got.Title)
+	}
+}
+
+func TestMigrateV2toV3_DedupSweep(t *testing.T) {
+	db := openTestDB(t)
+	r := NewDatabase(db)
+	withGlobalBmDb(t, r)
+
+	// Build a v2 database manually so we can seed http/https dupes before
+	// the v2→v3 sweep runs.
+	if err := r.createV2(); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.setUserVersion(2); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().Format(time.RFC3339)
+
+	// Pair where https has empty scraped data but http has content:
+	// content should be moved to the https row before deletion.
+	if _, err := db.Exec(
+		`INSERT INTO bookmarks (url, title, text, content_type, isScraped, dateAdded)
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		"http://example.com/a", "A", "scraped body", "text/html", 1, now,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(
+		`INSERT INTO bookmarks (url, title, text, content_type, dateAdded)
+		 VALUES (?, ?, '', '', ?)`,
+		"https://example.com/a", "A", now,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	// Lone http row without an https counterpart — must be preserved.
+	if _, err := db.Exec(
+		`INSERT INTO bookmarks (url, title, text, content_type, dateAdded)
+		 VALUES (?, ?, '', '', ?)`,
+		"http://only-http.test/", "lone", now,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.MigrateSchema(); err != nil {
+		t.Fatalf("MigrateSchema: %v", err)
+	}
+	if r.Version() != 3 {
+		t.Fatalf("version = %d, want 3", r.Version())
+	}
+
+	// http duplicate should be gone, https should have inherited the body.
+	if _, err := r.GetByUrl("http://example.com/a"); err == nil {
+		t.Error("http duplicate still present after sweep")
+	}
+	got, err := r.GetByUrl("https://example.com/a")
+	if err != nil {
+		t.Fatalf("GetByUrl https: %v", err)
+	}
+	if got.Text != "scraped body" {
+		t.Errorf("https Text = %q, want %q (should have inherited from http)", got.Text, "scraped body")
+	}
+	if got.ContentType != "text/html" {
+		t.Errorf("https ContentType = %q, want text/html (inherited)", got.ContentType)
+	}
+
+	// Lone http without an https counterpart is untouched.
+	if _, err := r.GetByUrl("http://only-http.test/"); err != nil {
+		t.Errorf("lone http row was deleted: %v", err)
 	}
 }
 

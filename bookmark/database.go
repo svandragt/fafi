@@ -7,6 +7,7 @@ import (
 	"github.com/mattn/go-sqlite3"
 	"log"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -19,7 +20,7 @@ var (
 
 // schemaVersion is the latest schema this binary writes. Bump and add a
 // migration step in MigrateSchema when changing schema shape.
-const schemaVersion = 2
+const schemaVersion = 3
 
 type Database struct {
 	db      *sql.DB
@@ -35,11 +36,12 @@ func NewDatabase(db *sql.DB) *Database {
 // MigrateSchema brings the database up to schemaVersion.
 //
 // Strategy:
-//   - empty DB (user_version=0): create v2 directly.
+//   - empty DB (user_version=0): create at the latest version directly.
 //   - v1 (the original FTS5 schema + bookmark_meta sibling table): leave
-//     in place. v1 → v2 migration only runs on explicit FAFI_RESET_INDEX
+//     in place. v1 → latest migration only runs on explicit FAFI_RESET_INDEX
 //     since it forces a full re-index (text + isScraped wiped).
-//   - v2: no-op.
+//   - v2 → v3: run dedup sweep automatically (cheap, idempotent).
+//   - already at latest: no-op.
 func (r *Database) MigrateSchema() error {
 	v, err := r.userVersion()
 	if err != nil {
@@ -51,13 +53,18 @@ func (r *Database) MigrateSchema() error {
 		if err := r.createV2(); err != nil {
 			return err
 		}
-		if err := r.setUserVersion(2); err != nil {
+		if err := r.setUserVersion(schemaVersion); err != nil {
 			return err
 		}
-		r.version = 2
-		log.Println("Database created (v2)")
+		r.version = schemaVersion
+		log.Printf("Database created (v%d)\n", schemaVersion)
 	case 1:
 		r.version = 1
+	case 2:
+		r.version = 2
+		if err := r.migrateV2toV3(); err != nil {
+			return err
+		}
 	case schemaVersion:
 		r.version = schemaVersion
 	default:
@@ -111,6 +118,78 @@ func (r *Database) createV2() error {
 	);
 	`)
 	return err
+}
+
+// migrateV2toV3 collapses http/https duplicates into the https variant.
+// Where the https row is missing scraped content but the http one has it,
+// the content is moved over before the http row is deleted.
+//
+// Idempotent: runs on every boot at v2; becomes a no-op once swept (and
+// bumps user_version=3 so the boot path skips it next time).
+func (r *Database) migrateV2toV3() error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// Find http URLs whose https counterpart also exists.
+	rows, err := tx.Query(`
+		SELECT b1.url
+		FROM bookmarks b1
+		WHERE b1.url LIKE 'http://%'
+		  AND EXISTS (
+		      SELECT 1 FROM bookmarks b2
+		      WHERE b2.url = 'https://' || substr(b1.url, 8)
+		  )`)
+	if err != nil {
+		return err
+	}
+	var httpURLs []string
+	for rows.Next() {
+		var u string
+		if err := rows.Scan(&u); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		httpURLs = append(httpURLs, u)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+
+	for _, httpURL := range httpURLs {
+		httpsURL := "https://" + httpURL[len("http://"):]
+		// Merge content from http into https if https has no scraped data yet.
+		if _, err := tx.Exec(`
+			UPDATE bookmarks
+			SET text = (SELECT text FROM bookmarks WHERE url = ?),
+			    content_type = (SELECT content_type FROM bookmarks WHERE url = ?),
+			    isScraped = (SELECT isScraped FROM bookmarks WHERE url = ?)
+			WHERE url = ?
+			  AND (text IS NULL OR text = '')
+			  AND (SELECT text FROM bookmarks WHERE url = ?) IS NOT NULL
+			  AND (SELECT text FROM bookmarks WHERE url = ?) <> ''`,
+			httpURL, httpURL, httpURL, httpsURL, httpURL, httpURL,
+		); err != nil {
+			return err
+		}
+		if _, err := tx.Exec("DELETE FROM bookmarks WHERE url = ?", httpURL); err != nil {
+			return err
+		}
+	}
+
+	if _, err := tx.Exec("PRAGMA user_version = 3"); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	r.version = 3
+	if len(httpURLs) > 0 {
+		log.Printf("Deduplicated %d http/https bookmark pair(s)", len(httpURLs))
+	}
+	return nil
 }
 
 // migrateToV2 rebuilds the FTS table at v2 and drops the sibling meta table.
@@ -168,6 +247,24 @@ func (r *Database) CreateOrGet(bm Bookmark) (*Bookmark, error) {
 	if existingBookmark != nil {
 		return existingBookmark, err
 	}
+
+	// Scheme-only dedup: treat http://X and https://X as the same bookmark,
+	// always preferring the https variant.
+	if other := otherSchemeURL(bm.URL); other != "" {
+		otherBm, _ := BmDb.GetByUrl(other)
+		if otherBm != nil {
+			if strings.HasPrefix(bm.URL, "http://") {
+				// Inserting http when https already exists → return https row.
+				return otherBm, nil
+			}
+			// Inserting https when http exists → drop http row, fall through
+			// and insert the https one.
+			if err := r.Delete(other); err != nil {
+				log.Println("dedup delete error:", err)
+			}
+		}
+	}
+
 	bm.DateAdded = SqlTime(time.Now())
 
 	var query string
@@ -323,8 +420,15 @@ func (r *Database) allV1(keywords string) ([]Bookmark, error) {
 // them on the next run. If the database is on an older schema, it is migrated
 // to the latest version first (which itself clears isScraped).
 func (r *Database) ResetIndex() error {
-	if r.version < schemaVersion {
-		return r.migrateToV2()
+	if r.version < 2 {
+		if err := r.migrateToV2(); err != nil {
+			return err
+		}
+	}
+	if r.version < 3 {
+		if err := r.migrateV2toV3(); err != nil {
+			return err
+		}
 	}
 	_, err := r.db.Exec("UPDATE bookmarks SET isScraped = NULL")
 	return err

@@ -21,3 +21,21 @@ func NormalizeURL(raw string) string {
 	}
 	return u.String()
 }
+
+// otherSchemeURL returns the same URL with http/https swapped, or "" if the
+// scheme isn't http/https. Used to find scheme-only duplicates.
+func otherSchemeURL(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "http":
+		u.Scheme = "https"
+	case "https":
+		u.Scheme = "http"
+	default:
+		return ""
+	}
+	return u.String()
+}
