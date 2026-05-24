@@ -58,8 +58,7 @@ func Index(bm Bookmark) {
 	bm.IsScraped = sql.NullBool{Bool: true, Valid: true}
 
 	if _, err := bmDb.Update(sourceUrl, bm); err != nil {
-		log.Fatal("Update error:", err)
-		return
+		log.Println("Update error:", err)
 	}
 }
 

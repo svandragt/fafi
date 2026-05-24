@@ -164,9 +164,9 @@ func bootDatabase() *sql.DB {
 
 // Environment variables
 func bootEnvironment() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Environment error:", err)
+	if err := godotenv.Load(); err != nil {
+		// .env is optional; absence or read errors should not block startup.
+		log.Println("No .env loaded:", err)
 	}
 }
 
@@ -174,7 +174,11 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	keywords := getSearchQuery(w, r)
 	bookmarks, err := bookmark.BmDb.All(keywords)
 	if err != nil {
-		log.Fatal("Bookmark error:", err)
+		// A malformed FTS query in ?q= can cause this; don't take the
+		// server down with the request.
+		log.Println("Bookmark query error:", err)
+		http.Error(w, "search error", http.StatusBadRequest)
+		return
 	}
 
 	var tpl = template.Must(template.New("EmbedHtmlIndex").Funcs(template.FuncMap{
@@ -185,9 +189,8 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		Bookmarks: bookmarks,
 		Query:     keywords,
 	}
-	err = tpl.Execute(w, data)
-	if err != nil {
-		log.Fatal("Error (execute):", err)
+	if err := tpl.Execute(w, data); err != nil {
+		log.Println("Template execute error:", err)
 	}
 }
 

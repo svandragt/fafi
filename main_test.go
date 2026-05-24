@@ -1,10 +1,15 @@
 package main
 
 import (
+	"database/sql"
 	"fafi2/bookmark"
+	"net/http"
+	"net/http/httptest"
 	"sync"
 	"sync/atomic"
 	"testing"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func TestIndexQueueCallsAllBookmarks(t *testing.T) {
@@ -32,5 +37,31 @@ func TestIndexQueueCallsAllBookmarks(t *testing.T) {
 		if !seen[bm.URL] {
 			t.Errorf("bookmark %s was not indexed", bm.URL)
 		}
+	}
+}
+
+// Regression: a DB error from handleIndex must not crash the server.
+// Previously handleIndex called log.Fatal on BmDb.All errors. We force
+// an error by closing the DB before the request.
+func TestHandleIndexDoesNotFatalOnDBError(t *testing.T) {
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+
+	prev := bookmark.BmDb
+	bookmark.BmDb = bookmark.NewDatabase(db)
+	t.Cleanup(func() { bookmark.BmDb = prev })
+	if err := bookmark.BmDb.MigrateSchema(); err != nil {
+		t.Fatalf("MigrateSchema: %v", err)
+	}
+	_ = db.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/?q=foo", nil)
+	rec := httptest.NewRecorder()
+	handleIndex(rec, req) // must not call log.Fatal / panic
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 }

@@ -307,10 +307,8 @@ func (r *Database) CreateOrGet(bm Bookmark) (*Bookmark, error) {
 
 func (r *Database) CreateMany(bms []Bookmark) {
 	for _, bm := range bms {
-		_, err := r.CreateOrGet(bm)
-		if err != nil {
-			log.Fatal("Error creating bookmark:", err)
-			return
+		if _, err := r.CreateOrGet(bm); err != nil {
+			log.Println("CreateMany error for", bm.URL, ":", err)
 		}
 	}
 }
@@ -521,23 +519,23 @@ func (r *Database) GetByUrl(url string) (*Bookmark, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotExists
 		}
-		log.Fatal("GetByUrl error:", err)
+		return nil, err
 	}
 	return &bm, nil
 }
 
-func (r *Database) GetLastDateAddedMicro() int64 {
+func (r *Database) GetLastDateAddedMicro() (int64, error) {
 	row := r.db.QueryRow("SELECT dateAdded FROM bookmarks ORDER BY dateAdded DESC LIMIT 1")
 
 	var bm Bookmark
 	if err := row.Scan(&bm.DateAdded); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 100000
+			return 100000, nil
 		}
-		log.Fatal("GetLastDateAdded error:", err)
+		return 0, err
 	}
 	st := time.Time(bm.DateAdded)
-	return st.UnixMicro()
+	return st.UnixMicro(), nil
 }
 
 func (r *Database) Update(url string, updated Bookmark) (*Bookmark, error) {
