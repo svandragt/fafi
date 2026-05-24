@@ -3,7 +3,8 @@ Web content indexing and search tool.
 
 1. Easily index your browser bookmarks: importing list of files, a live Firefox profile, and individual URLs
 2. Store the readability content of each bookmark
-3. Full text search matching the title and contents of the collection.
+3. Full text search matching the title and contents of the collection
+4. Detect non-text bookmarks (PDFs, images, video, audio) — saved with a category icon, skipped for article extraction.
 
 In the latest incarnation:
 
@@ -29,7 +30,8 @@ FAFI_SKIP_RECORDS=0
 # Set to 0 to disable indexing on startup
 FAFI_ENABLE_INDEXING=1
 # Set to 1 to clear the indexed state on every bookmark before indexing
-# (forces a full re-index). Unset after one run.
+# (forces a full re-index). Also migrates legacy databases to the latest
+# schema version. Unset after one run.
 FAFI_RESET_INDEX=0
 # Default database path:
 FAFI_DB_FILEPATH=/home/user/fafi.sqlite3

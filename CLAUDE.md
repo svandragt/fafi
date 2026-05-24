@@ -15,10 +15,19 @@ fafi is a self-hosted bookmark indexer and search tool. A single Go binary start
 4. `bootServer` — `http.ListenAndServe`, renders `pub/index.html` (embedded via `//go:embed`)
 
 Packages:
-- `bookmark/` — domain model, SQLite access (`BmDb` global), readability extraction, FTS5 queries
+- `bookmark/` — domain model, SQLite access (`BmDb` global), readability extraction, FTS5 queries, content-type probing (`probe.go`)
 - `integration/` — external sources (Firefox `places.sqlite` import)
 - `sander/` — utility helpers: env+CLI arg resolution (`GetArgFromEnvWithDefault` — CLI flag overrides env), debug state, file/string helpers
 - `pub/` — embedded HTML templates
+
+## Schema versioning
+
+Tracked via `PRAGMA user_version`; `bookmark.schemaVersion` is the latest the binary writes.
+
+- **v1** (legacy, pre-versioning): FTS5 `bookmarks(url, title, text, isScraped, dateAdded)` + sibling `bookmark_meta(url, content_type)` table. Detected when `user_version=0` AND a `bookmarks` table exists.
+- **v2**: FTS5 `bookmarks(url, title, text, content_type, isScraped UNINDEXED, dateAdded UNINDEXED)` — no sibling table. `UNINDEXED` skips tokenization for columns never used with `MATCH`.
+
+Migration v1 → v2 only runs on `FAFI_RESET_INDEX=1` (since it forces a full re-fetch). Fresh databases are always created at v2. Read/write paths branch on `Database.version`. Future cleanup: once enough time has passed, drop v1 branches and either auto-migrate on boot or refuse to start with a clear message.
 
 Config: every `FAFI_FOO_BAR` env var has a `--foo-bar` CLI equivalent (resolved through `sander.GetArgFromEnvWithDefault`). See README for the full list.
 
