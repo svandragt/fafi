@@ -60,6 +60,16 @@ func (r *Database) MigrateSchema() error {
 		log.Printf("Database created (v%d)\n", schemaVersion)
 	case 1:
 		r.version = 1
+		// Pre-versioning installs never had bookmark_meta; create it
+		// lazily so v1 read paths can LEFT JOIN safely.
+		if _, err := r.db.Exec(
+			`CREATE TABLE IF NOT EXISTS bookmark_meta (
+				url TEXT PRIMARY KEY,
+				content_type TEXT
+			)`,
+		); err != nil {
+			return err
+		}
 	case 2:
 		r.version = 2
 		if err := r.migrateV2toV3(); err != nil {
