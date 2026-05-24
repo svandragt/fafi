@@ -97,12 +97,7 @@
         <h4>{{$icon := contentTypeIcon .ContentType}}{{if $icon}}<span class="ct-icon" title="{{.ContentType}}">{{$icon}}</span> {{end}}<a href="{{.URL}}">{{.Title}}</a></h4>
         <small>{{.URL}}</small>
         {{ if .Text }}
-        <blockquote>{{ if ge (len .Text) 320 }}
-            {{slice .Text 0 320}}&hellip;
-            {{ else }}
-            {{ .Text }}
-            {{ end }}
-        </blockquote>
+        <blockquote>{{ runeSnippet .Text 320 }}</blockquote>
         {{ end }}
     </li>
     {{end}}

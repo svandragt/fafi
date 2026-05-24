@@ -51,6 +51,21 @@ type TemplateData struct {
 //go:embed pub/index.html
 var EmbedHtmlIndex string
 
+// runeSnippet truncates s to at most n runes (not bytes), appending "…" when
+// truncated. Used by the template to avoid cutting a UTF-8 sequence mid-rune.
+func runeSnippet(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[:n]) + "…"
+}
+
+var indexTpl = template.Must(template.New("EmbedHtmlIndex").Funcs(template.FuncMap{
+	"contentTypeIcon": contentTypeIcon,
+	"runeSnippet":     runeSnippet,
+}).Parse(EmbedHtmlIndex))
+
 func main() {
 	bootEnvironment()
 	sander.UpdateDebugState()
@@ -181,15 +196,11 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var tpl = template.Must(template.New("EmbedHtmlIndex").Funcs(template.FuncMap{
-		"contentTypeIcon": contentTypeIcon,
-	}).Parse(EmbedHtmlIndex))
-
 	data := TemplateData{
 		Bookmarks: bookmarks,
 		Query:     keywords,
 	}
-	if err := tpl.Execute(w, data); err != nil {
+	if err := indexTpl.Execute(w, data); err != nil {
 		log.Println("Template execute error:", err)
 	}
 }
