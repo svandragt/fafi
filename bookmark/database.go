@@ -20,7 +20,7 @@ var (
 
 // schemaVersion is the latest schema this binary writes. Bump and add a
 // migration step in MigrateSchema when changing schema shape.
-const schemaVersion = 6
+const schemaVersion = 7
 
 type Database struct {
 	db      *sql.DB
@@ -83,6 +83,9 @@ func (r *Database) MigrateSchema() error {
 		if err := r.migrateV5toV6(); err != nil {
 			return err
 		}
+		if err := r.migrateV6toV7(); err != nil {
+			return err
+		}
 	case 2:
 		r.version = 2
 		if err := r.migrateV2toV3(); err != nil {
@@ -97,6 +100,9 @@ func (r *Database) MigrateSchema() error {
 		if err := r.migrateV5toV6(); err != nil {
 			return err
 		}
+		if err := r.migrateV6toV7(); err != nil {
+			return err
+		}
 	case 3:
 		r.version = 3
 		if err := r.migrateV3toV4(); err != nil {
@@ -106,6 +112,9 @@ func (r *Database) MigrateSchema() error {
 			return err
 		}
 		if err := r.migrateV5toV6(); err != nil {
+			return err
+		}
+		if err := r.migrateV6toV7(); err != nil {
 			return err
 		}
 	case 4:
@@ -119,6 +128,14 @@ func (r *Database) MigrateSchema() error {
 	case 5:
 		r.version = 5
 		if err := r.migrateV5toV6(); err != nil {
+			return err
+		}
+		if err := r.migrateV6toV7(); err != nil {
+			return err
+		}
+	case 6:
+		r.version = 6
+		if err := r.migrateV6toV7(); err != nil {
 			return err
 		}
 	case schemaVersion:
@@ -306,10 +323,58 @@ func (r *Database) createV2() error {
 	    text,
 	    content_type,
 	    isScraped UNINDEXED,
-	    dateAdded UNINDEXED
+	    dateAdded UNINDEXED,
+	    tokenize = 'porter unicode61 remove_diacritics 1'
 	);
 	`)
 	return err
+}
+
+// migrateV6toV7 rebuilds the bookmarks FTS5 table with the porter+unicode61
+// tokenizer so searches stem morphological variants ("design" matches
+// "designed", "designs", "designing"). The table is rebuilt by copying rows
+// into a new virtual table and renaming — FTS5 doesn't support ALTER on
+// tokenizer.
+func (r *Database) migrateV6toV7() error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec(`
+	CREATE VIRTUAL TABLE bookmarks_v7 USING FTS5(
+	    url,
+	    title,
+	    text,
+	    content_type,
+	    isScraped UNINDEXED,
+	    dateAdded UNINDEXED,
+	    tokenize = 'porter unicode61 remove_diacritics 1'
+	);`); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(
+		`INSERT INTO bookmarks_v7 (url, title, text, content_type, isScraped, dateAdded)
+		 SELECT url, title, text, content_type, isScraped, dateAdded FROM bookmarks`,
+	); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("DROP TABLE bookmarks"); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("ALTER TABLE bookmarks_v7 RENAME TO bookmarks"); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("PRAGMA user_version = 7"); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	r.version = 7
+	log.Println("Database migrated to v7 (porter stemming)")
+	return nil
 }
 
 // migrateV2toV3 collapses http/https duplicates into the https variant.
