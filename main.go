@@ -190,6 +190,7 @@ func bootServer() {
 	http.HandleFunc("/reindex", handleReindex)
 	http.HandleFunc("/edit", handleEdit)
 	http.HandleFunc("/delete", handleDelete)
+	http.HandleFunc("/text", handleText)
 
 	log.Println("Server starting on http://localhost:" + port)
 	err := http.ListenAndServe(":"+port, nil)
@@ -361,6 +362,24 @@ func handleEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	redirectBack(w, r)
+}
+
+func handleText(w http.ResponseWriter, r *http.Request) {
+	target := r.URL.Query().Get("url")
+	if target == "" {
+		http.Error(w, "missing url", http.StatusBadRequest)
+		return
+	}
+	text, err := bookmark.BmDb.GetText(target)
+	if err != nil {
+		log.Println("GetText error:", err)
+		http.Error(w, "lookup error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	if _, err := w.Write([]byte(text)); err != nil {
+		log.Println("text write error:", err)
+	}
 }
 
 func handleDelete(w http.ResponseWriter, r *http.Request) {

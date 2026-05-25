@@ -261,6 +261,24 @@
             font-size: 0.9rem;
             line-height: 1.6;
             max-width: 65ch;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background 120ms ease;
+        }
+        .snippet:hover {
+            background: var(--surface-soft);
+        }
+        .snippet[data-expanded="true"] {
+            cursor: zoom-out;
+            white-space: pre-wrap;
+            max-width: 70ch;
+            padding: 0.5rem 0.75rem;
+            background: var(--surface-soft);
+            border: 1px solid var(--border);
+        }
+        .snippet[data-expanded="loading"] {
+            opacity: 0.6;
+            cursor: progress;
         }
 
         /* PILLS */
@@ -448,7 +466,7 @@
         </div>
         <h3 class="result-title"><a href="{{.URL}}" data-title-link>{{.Title}}</a></h3>
         {{ if .Text }}
-        <p class="snippet">{{ runeSnippet .Text 320 }}</p>
+        <p class="snippet" data-snippet title="Click to read full text">{{ runeSnippet .Text 320 }}</p>
         {{ end }}
     </li>
     {{end}}
@@ -657,6 +675,42 @@
             }
         });
     })();
+
+    document.addEventListener('click', function (e) {
+        const snip = e.target.closest('[data-snippet]');
+        if (!snip) return;
+        if (e.target.closest('a')) return;
+        toggleSnippet(snip);
+    });
+
+    function toggleSnippet(snip) {
+        const li = snip.closest('li');
+        if (!li) return;
+        const url = li.dataset.url;
+        if (snip.dataset.expanded === 'true') {
+            snip.textContent = snip.dataset.original;
+            snip.dataset.expanded = '';
+            snip.title = 'Click to read full text';
+            return;
+        }
+        if (snip.dataset.expanded === 'loading') return;
+        snip.dataset.original = snip.textContent;
+        snip.dataset.expanded = 'loading';
+        snip.title = 'Loading…';
+        fetch('/text?url=' + encodeURIComponent(url))
+            .then(r => r.ok ? r.text() : Promise.reject(new Error('HTTP ' + r.status)))
+            .then(text => {
+                if (!text) text = '(no full text indexed)';
+                snip.textContent = text;
+                snip.dataset.expanded = 'true';
+                snip.title = 'Click to collapse';
+            })
+            .catch(err => {
+                snip.dataset.expanded = '';
+                snip.title = 'Click to read full text';
+                alert('Failed to load text: ' + err.message);
+            });
+    }
 
     function editPrompt(form) {
         const current = form.elements['url'].value;

@@ -924,6 +924,20 @@ func (r *Database) ClearStatuses() error {
 	return err
 }
 
+// GetText returns the full extracted text for a URL. Empty string if the row
+// has no text or doesn't exist.
+func (r *Database) GetText(url string) (string, error) {
+	var t string
+	err := r.db.QueryRow("SELECT text FROM bookmarks WHERE url = ?", url).Scan(&t)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil
+		}
+		return "", err
+	}
+	return t, nil
+}
+
 // IsDeleted reports whether a URL is in the tombstone table.
 func (r *Database) IsDeleted(url string) bool {
 	if r.version < 6 {
