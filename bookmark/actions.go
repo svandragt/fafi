@@ -4,7 +4,9 @@ import (
 	"database/sql"
 	"fafi2/sander"
 	"github.com/advancedlogic/GoOse"
+	"html"
 	"log"
+	"regexp"
 	"strings"
 )
 
@@ -62,9 +64,14 @@ func index(bm Bookmark, overwrite bool) {
 	}
 	if overwrite || bm.Title == "" {
 		extracted := pickTitle(article)
-		if extracted != "" {
+		switch {
+		case extracted != "":
 			bm.Title = extracted
-		} else if bm.Title == "" {
+		case overwrite:
+			// Reindex of a previously-malformed row — replace with URL so the
+			// bad title doesn't linger.
+			bm.Title = article.FinalURL
+		case bm.Title == "":
 			bm.Title = article.FinalURL
 		}
 	}
@@ -83,26 +90,37 @@ func index(bm Bookmark, overwrite bool) {
 	}
 }
 
-// pickTitle prefers the page's <head><title> over Goose's extracted title.
-// Goose sometimes concatenates header/nav text into article.Title (seen on
-// theverge.com), which is far worse than the canonical <title> tag.
-// Falls back to Goose's title only when the <title> tag is empty or absurdly
-// long (>300 chars, which usually means it caught nav noise too).
-func pickTitle(article *goose.Article) string {
-	var headTitle string
-	if article.Doc != nil {
-		headTitle = strings.TrimSpace(article.Doc.Find("head title").First().Text())
+var titleTagRe = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
+
+// firstHTMLTitle returns the text inside the first <title> tag of the raw
+// HTML. Goose's cleaned article.Doc is unreliable here — some pages (e.g.
+// theverge.com, newrepublic.com) carry multiple <title> elements and Goose's
+// goquery selection concatenates them, producing garbled nav text. Parsing
+// the raw HTML directly avoids that.
+func firstHTMLTitle(rawHTML string) string {
+	m := titleTagRe.FindStringSubmatch(rawHTML)
+	if len(m) < 2 {
+		return ""
 	}
+	return strings.TrimSpace(html.UnescapeString(m[1]))
+}
+
+// pickTitle prefers the first raw <title> tag over Goose's extracted title.
+// Falls back to Goose's title only when the <title> tag is empty or itself
+// looks malformed. Returns "" when no usable candidate exists so the caller
+// can substitute the URL.
+func pickTitle(article *goose.Article) string {
+	headTitle := firstHTMLTitle(article.RawHTML)
 	if headTitle != "" && !looksMalformedTitle(headTitle) {
 		return headTitle
 	}
 	if article.Title != "" && !looksMalformedTitle(article.Title) {
 		return article.Title
 	}
-	if headTitle != "" {
+	if headTitle != "" && len(headTitle) <= 300 {
 		return headTitle
 	}
-	return article.Title
+	return ""
 }
 
 // looksMalformedTitle returns true for strings that are obviously nav/chrome
