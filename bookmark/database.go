@@ -20,7 +20,7 @@ var (
 
 // schemaVersion is the latest schema this binary writes. Bump and add a
 // migration step in MigrateSchema when changing schema shape.
-const schemaVersion = 5
+const schemaVersion = 6
 
 type Database struct {
 	db      *sql.DB
@@ -56,6 +56,9 @@ func (r *Database) MigrateSchema() error {
 		if err := r.createStatusTable(); err != nil {
 			return err
 		}
+		if err := r.createDeletedTable(); err != nil {
+			return err
+		}
 		if err := r.setUserVersion(schemaVersion); err != nil {
 			return err
 		}
@@ -77,6 +80,9 @@ func (r *Database) MigrateSchema() error {
 		if err := r.migrateV4toV5(); err != nil {
 			return err
 		}
+		if err := r.migrateV5toV6(); err != nil {
+			return err
+		}
 	case 2:
 		r.version = 2
 		if err := r.migrateV2toV3(); err != nil {
@@ -88,6 +94,9 @@ func (r *Database) MigrateSchema() error {
 		if err := r.migrateV4toV5(); err != nil {
 			return err
 		}
+		if err := r.migrateV5toV6(); err != nil {
+			return err
+		}
 	case 3:
 		r.version = 3
 		if err := r.migrateV3toV4(); err != nil {
@@ -96,9 +105,20 @@ func (r *Database) MigrateSchema() error {
 		if err := r.migrateV4toV5(); err != nil {
 			return err
 		}
+		if err := r.migrateV5toV6(); err != nil {
+			return err
+		}
 	case 4:
 		r.version = 4
 		if err := r.migrateV4toV5(); err != nil {
+			return err
+		}
+		if err := r.migrateV5toV6(); err != nil {
+			return err
+		}
+	case 5:
+		r.version = 5
+		if err := r.migrateV5toV6(); err != nil {
 			return err
 		}
 	case schemaVersion:
@@ -141,6 +161,31 @@ func (r *Database) setUserVersion(v int) error {
 	// PRAGMA does not accept bound parameters.
 	_, err := r.db.Exec("PRAGMA user_version = " + strconv.Itoa(v))
 	return err
+}
+
+// createDeletedTable creates the tombstone table that records soft-deleted
+// bookmarks so re-imports don't re-add them.
+func (r *Database) createDeletedTable() error {
+	_, err := r.db.Exec(`
+	CREATE TABLE IF NOT EXISTS bookmark_deleted (
+		url TEXT PRIMARY KEY,
+		deleted_at TEXT
+	);
+	`)
+	return err
+}
+
+// migrateV5toV6 adds the bookmark_deleted tombstone table.
+func (r *Database) migrateV5toV6() error {
+	if err := r.createDeletedTable(); err != nil {
+		return err
+	}
+	if err := r.setUserVersion(6); err != nil {
+		return err
+	}
+	r.version = 6
+	log.Println("Database migrated to v6")
+	return nil
 }
 
 // createStatusTable creates the sibling table that stores HTTP status codes
@@ -392,8 +437,16 @@ func (r *Database) migrateToV2() error {
 	return nil
 }
 
+// ErrDeleted indicates a soft-deleted URL is being re-added; the caller
+// should treat it as a no-op rather than an error.
+var ErrDeleted = errors.New("bookmark is soft-deleted")
+
 func (r *Database) CreateOrGet(bm Bookmark) (*Bookmark, error) {
 	bm.URL = NormalizeURL(bm.URL)
+
+	if r.IsDeleted(bm.URL) {
+		return nil, ErrDeleted
+	}
 
 	existingBookmark, err := BmDb.GetByUrl(bm.URL)
 	if existingBookmark != nil {
@@ -445,7 +498,7 @@ func (r *Database) CreateOrGet(bm Bookmark) (*Bookmark, error) {
 
 func (r *Database) CreateMany(bms []Bookmark) {
 	for _, bm := range bms {
-		if _, err := r.CreateOrGet(bm); err != nil {
+		if _, err := r.CreateOrGet(bm); err != nil && !errors.Is(err, ErrDeleted) {
 			log.Println("CreateMany error for", bm.URL, ":", err)
 		}
 	}
@@ -868,6 +921,34 @@ func (r *Database) ClearStatuses() error {
 		return nil
 	}
 	_, err := r.db.Exec("DELETE FROM bookmark_status")
+	return err
+}
+
+// IsDeleted reports whether a URL is in the tombstone table.
+func (r *Database) IsDeleted(url string) bool {
+	if r.version < 6 {
+		return false
+	}
+	var one int
+	err := r.db.QueryRow("SELECT 1 FROM bookmark_deleted WHERE url = ?", url).Scan(&one)
+	return err == nil
+}
+
+// SoftDelete removes the bookmark from the searchable set and records its URL
+// in the tombstone table so future imports skip it. Idempotent: deleting an
+// already-tombstoned URL is fine.
+func (r *Database) SoftDelete(url string) error {
+	if r.version < 6 {
+		return errors.New("schema does not support soft delete")
+	}
+	if err := r.Delete(url); err != nil && !errors.Is(err, ErrDeleteFailed) {
+		return err
+	}
+	_, err := r.db.Exec(
+		`INSERT INTO bookmark_deleted (url, deleted_at) VALUES (?, ?)
+		 ON CONFLICT(url) DO UPDATE SET deleted_at = excluded.deleted_at`,
+		url, time.Now().UTC().Format(time.RFC3339),
+	)
 	return err
 }
 

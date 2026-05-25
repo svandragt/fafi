@@ -187,6 +187,60 @@
             .layout { grid-template-columns: 1fr; }
         }
 
+        ol li.kb-selected {
+            outline: 2px solid #4a90e2;
+            outline-offset: 4px;
+            border-radius: 3px;
+        }
+
+        #kb-help {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        #kb-help[hidden] {
+            display: none !important;
+        }
+
+        #kb-help.visible {
+            display: flex;
+        }
+
+        #kb-help .panel {
+            background: white;
+            padding: 1.5em 2em;
+            border-radius: 6px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            min-width: 320px;
+            font-size: 0.95rem;
+        }
+
+        #kb-help h3 {
+            margin: 0 0 0.8em 0;
+        }
+
+        #kb-help table {
+            border-collapse: collapse;
+        }
+
+        #kb-help td {
+            padding: 0.2em 0.6em 0.2em 0;
+        }
+
+        #kb-help kbd {
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            padding: 0.1em 0.4em;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
         #indexing-status {
             grid-column: 1 / -1;
             background: #fff3a3;
@@ -247,6 +301,10 @@
                 <input type="hidden" name="new_url" value="">
                 <button type="submit" title="Edit URL">Edit</button>
             </form>
+            <form method="post" action="/delete" data-delete>
+                <input type="hidden" name="url" value="{{.URL}}">
+                <button type="submit" title="Soft delete: hide from search and block re-import">Delete</button>
+            </form>
         </span>
         {{ if .Text }}
         <blockquote>{{ runeSnippet .Text 320 }}</blockquote>
@@ -254,6 +312,22 @@
     </li>
     {{end}}
 </ol>
+</div>
+
+<div id="kb-help" hidden>
+    <div class="panel" role="dialog" aria-label="Keyboard shortcuts">
+        <h3>Keyboard shortcuts</h3>
+        <table>
+            <tr><td><kbd>/</kbd></td><td>Focus the search box</td></tr>
+            <tr><td><kbd>Esc</kbd></td><td>Clear search, then blur</td></tr>
+            <tr><td><kbd>j</kbd> / <kbd>↓</kbd></td><td>Next result</td></tr>
+            <tr><td><kbd>k</kbd> / <kbd>↑</kbd></td><td>Previous result</td></tr>
+            <tr><td><kbd>Enter</kbd></td><td>Open the selected result</td></tr>
+            <tr><td><kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Enter</kbd></td><td>Open in new tab</td></tr>
+            <tr><td><kbd>?</kbd></td><td>Toggle this help</td></tr>
+            <tr><td><kbd>Esc</kbd></td><td>Close this help</td></tr>
+        </table>
+    </div>
 </div>
 
 <footer><small><em><a href="https://github.com/svandragt/fafi/">Fafi</a> -- Web content indexing and search
@@ -282,6 +356,17 @@
 
     document.addEventListener('submit', function (e) {
         const form = e.target;
+        if (form.matches('form[data-delete]')) {
+            e.preventDefault();
+            if (!confirm('Soft-delete this bookmark? It will be hidden and blocked from re-import.')) return;
+            const li = form.closest('li');
+            const body = new URLSearchParams(new FormData(form));
+            fetch(form.action, { method: 'POST', body })
+                .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+                .then(() => { li.remove(); })
+                .catch(err => alert('Delete failed: ' + err.message));
+            return;
+        }
         if (!form.matches('form[data-reindex]')) return;
         e.preventDefault();
         const li = form.closest('li');
@@ -343,6 +428,110 @@
         if (code >= 500 && code < 600) return 's5';
         return 's0';
     }
+
+    (function setupKeyboardShortcuts() {
+        const searchInput = document.querySelector('input[name="q"]');
+        const helpEl = document.getElementById('kb-help');
+        let selectedIndex = -1;
+
+        function results() {
+            return Array.from(document.querySelectorAll('ol > li'));
+        }
+
+        function setSelected(index) {
+            const items = results();
+            if (items.length === 0) return;
+            if (index < 0) index = 0;
+            if (index >= items.length) index = items.length - 1;
+            items.forEach(li => li.classList.remove('kb-selected'));
+            const target = items[index];
+            target.classList.add('kb-selected');
+            target.scrollIntoView({ block: 'nearest' });
+            selectedIndex = index;
+        }
+
+        function isEditable(el) {
+            if (!el) return false;
+            const tag = el.tagName;
+            return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
+        }
+
+        function toggleHelp(show) {
+            const visible = show !== undefined ? show : helpEl.hasAttribute('hidden');
+            if (visible) {
+                helpEl.removeAttribute('hidden');
+                helpEl.classList.add('visible');
+            } else {
+                helpEl.setAttribute('hidden', '');
+                helpEl.classList.remove('visible');
+            }
+        }
+
+        helpEl.addEventListener('click', function (e) {
+            if (e.target === helpEl) toggleHelp(false);
+        });
+
+        document.addEventListener('keydown', function (e) {
+            // Help overlay handling.
+            if (!helpEl.hasAttribute('hidden')) {
+                if (e.key === 'Escape' || e.key === '?') {
+                    e.preventDefault();
+                    toggleHelp(false);
+                }
+                return;
+            }
+
+            // Search input has its own Esc behaviour; other shortcuts skipped
+            // while typing.
+            if (isEditable(document.activeElement)) {
+                if (e.key === 'Escape' && document.activeElement === searchInput) {
+                    if (searchInput.value !== '') {
+                        searchInput.value = '';
+                    } else {
+                        searchInput.blur();
+                    }
+                    e.preventDefault();
+                }
+                return;
+            }
+
+            switch (e.key) {
+                case '/':
+                    e.preventDefault();
+                    searchInput.focus();
+                    searchInput.select();
+                    break;
+                case '?':
+                    e.preventDefault();
+                    toggleHelp(true);
+                    break;
+                case 'j':
+                case 'ArrowDown':
+                    e.preventDefault();
+                    setSelected(selectedIndex < 0 ? 0 : selectedIndex + 1);
+                    break;
+                case 'k':
+                case 'ArrowUp':
+                    e.preventDefault();
+                    setSelected(selectedIndex < 0 ? 0 : selectedIndex - 1);
+                    break;
+                case 'Enter':
+                    if (selectedIndex >= 0) {
+                        const items = results();
+                        const link = items[selectedIndex] && items[selectedIndex].querySelector('h4 a');
+                        if (link) {
+                            e.preventDefault();
+                            if (e.ctrlKey || e.metaKey) {
+                                window.open(link.href, '_blank');
+                            } else {
+                                window.location.href = link.href;
+                            }
+                        }
+                    }
+                    break;
+            }
+        });
+    })();
 
     function editPrompt(form) {
         const current = form.elements['url'].value;

@@ -189,6 +189,7 @@ func bootServer() {
 	http.HandleFunc("/events", handleEvents)
 	http.HandleFunc("/reindex", handleReindex)
 	http.HandleFunc("/edit", handleEdit)
+	http.HandleFunc("/delete", handleDelete)
 
 	log.Println("Server starting on http://localhost:" + port)
 	err := http.ListenAndServe(":"+port, nil)
@@ -360,6 +361,27 @@ func handleEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	redirectBack(w, r)
+}
+
+func handleDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	target := r.FormValue("url")
+	if target == "" {
+		http.Error(w, "missing url", http.StatusBadRequest)
+		return
+	}
+	if err := bookmark.BmDb.SoftDelete(target); err != nil {
+		log.Println("SoftDelete error:", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if _, err := w.Write([]byte(`{"ok":true}`)); err != nil {
+		log.Println("delete write error:", err)
+	}
 }
 
 func redirectBack(w http.ResponseWriter, r *http.Request) {
