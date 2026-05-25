@@ -466,7 +466,7 @@
         </div>
         <h3 class="result-title"><a href="{{.URL}}" data-title-link>{{.Title}}</a></h3>
         {{ if .Text }}
-        <p class="snippet" data-snippet title="Click to read full text">{{ runeSnippet .Text 320 }}</p>
+        <p class="snippet" data-snippet title="Click to read full text">{{ highlightSnippet .Text 320 }}</p>
         {{ end }}
     </li>
     {{end}}

@@ -53,14 +53,45 @@ type TemplateData struct {
 //go:embed pub/index.html
 var EmbedHtmlIndex string
 
-// runeSnippet truncates s to at most n runes (not bytes), appending "…" when
-// truncated. Used by the template to avoid cutting a UTF-8 sequence mid-rune.
-func runeSnippet(s string, n int) string {
-	r := []rune(s)
-	if len(r) <= n {
-		return s
+// highlightSnippet renders a snippet that may contain FTS5 match markers
+// (\x02 open, \x03 close) as HTML, wrapping marked runs in <mark>. Truncates
+// to n visible runes, ignoring marker bytes so the cap reflects what the
+// reader sees. The output is safe for template injection.
+func highlightSnippet(s string, n int) template.HTML {
+	var b strings.Builder
+	b.Grow(len(s))
+	visible := 0
+	inMark := false
+	truncated := false
+	for _, r := range s {
+		switch r {
+		case '\x02':
+			if !inMark {
+				b.WriteString("<mark>")
+				inMark = true
+			}
+			continue
+		case '\x03':
+			if inMark {
+				b.WriteString("</mark>")
+				inMark = false
+			}
+			continue
+		}
+		if visible >= n {
+			truncated = true
+			break
+		}
+		template.HTMLEscape(&b, []byte(string(r)))
+		visible++
 	}
-	return string(r[:n]) + "…"
+	if inMark {
+		b.WriteString("</mark>")
+	}
+	if truncated {
+		b.WriteString("…")
+	}
+	return template.HTML(b.String())
 }
 
 // statusClass maps an HTTP status code to a CSS class for the pill color.
@@ -97,7 +128,7 @@ func filterURL(query, status string) string {
 
 var indexTpl = template.Must(template.New("EmbedHtmlIndex").Funcs(template.FuncMap{
 	"contentTypeIcon": contentTypeIcon,
-	"runeSnippet":     runeSnippet,
+	"highlightSnippet": highlightSnippet,
 	"statusClass":     statusClass,
 	"filterURL":       filterURL,
 }).Parse(EmbedHtmlIndex))

@@ -595,10 +595,31 @@ func (r *Database) allV2(keywords string) ([]Bookmark, error) {
 	return r.allV2Filtered(keywords, "")
 }
 
+// sanitizeFTSQuery replaces characters the FTS5 query parser treats as
+// punctuation/operators with spaces so user input like "lidarr.audio" or
+// "github.com/foo" tokenises into searchable terms (lidarr AND audio).
+// Quotes are stripped to avoid unterminated phrase-query errors.
+func sanitizeFTSQuery(q string) string {
+	var b strings.Builder
+	b.Grow(len(q))
+	for _, r := range q {
+		switch r {
+		case '.', '/', ':', '?', '#', '&', '=', '+', '%', '\\', '"', '\'', '(', ')', '[', ']', '{', '}', '<', '>', ',', ';', '!', '@', '|', '~', '`', '^', '*':
+			b.WriteByte(' ')
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return strings.Join(strings.Fields(b.String()), " ")
+}
+
 func (r *Database) allV2Filtered(keywords, statusFilter string) ([]Bookmark, error) {
 	var rows *sql.Rows
 	var err error
 	filterClause, _ := statusFilterClause(statusFilter)
+	if keywords != "" {
+		keywords = sanitizeFTSQuery(keywords)
+	}
 	if keywords != "" {
 		//goland:noinspection SqlSignature,SqlResolve
 		rows, err = r.db.Query(`
@@ -610,14 +631,10 @@ func (r *Database) allV2Filtered(keywords, statusFilter string) ([]Bookmark, err
 				isScraped,
 				dateAdded
 			FROM bookmarks
-			WHERE text is not '' AND (
-				title MATCH ? OR
-				url MATCH ? OR
-				text MATCH ?
-			)`+filterClause+`
-			ORDER BY rank
+			WHERE text is not '' AND bookmarks MATCH ?`+filterClause+`
+			ORDER BY bm25(bookmarks, 1.0, 3.0, 1.0, 1.0, 1.0, 1.0)
 			LIMIT ?`,
-			"[", "]", keywords, keywords, keywords, 50,
+			"\x02", "\x03", keywords, 50,
 		)
 	} else {
 		rows, err = r.db.Query(
@@ -705,14 +722,10 @@ func (r *Database) allV1(keywords string) ([]Bookmark, error) {
 				m.content_type
 			FROM bookmarks b
 			LEFT JOIN bookmark_meta m ON m.url = b.url
-			WHERE b.text is not '' AND (
-				b.title MATCH ? OR
-				b.url MATCH ? OR
-				b.text MATCH ?
-			)
-			ORDER BY rank
+			WHERE b.text is not '' AND bookmarks MATCH ?
+			ORDER BY bm25(bookmarks, 1.0, 3.0, 1.0, 1.0, 1.0)
 			LIMIT ?`,
-			"[", "]", keywords, keywords, keywords, 50,
+			"\x02", "\x03", keywords, 50,
 		)
 	} else {
 		rows, err = r.db.Query(`
