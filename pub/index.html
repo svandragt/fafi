@@ -4,315 +4,455 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Fafi</title>
-    <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
     <style>
+        :root {
+            --bg: oklch(0.985 0.004 85);
+            --surface: oklch(1 0 0);
+            --surface-soft: oklch(0.965 0.005 250);
+            --border: oklch(0.91 0.005 250);
+            --border-strong: oklch(0.85 0.008 250);
+            --text: oklch(0.22 0.012 250);
+            --text-muted: oklch(0.5 0.012 250);
+            --text-subtle: oklch(0.65 0.01 250);
+            --link: oklch(0.45 0.17 255);
+            --link-hover: oklch(0.38 0.18 255);
+            --link-visited: oklch(0.42 0.13 295);
+            --accent: oklch(0.55 0.18 255);
+            --accent-soft: oklch(0.95 0.04 255);
+            --mark: oklch(0.94 0.1 95);
+            --shadow-sm: 0 1px 2px oklch(0.5 0.05 250 / 0.06);
+            --shadow-md: 0 4px 18px oklch(0.4 0.05 250 / 0.12);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-pill: 999px;
+            color-scheme: light;
+        }
+
+        * { box-sizing: border-box; }
+
+        html {
+            -webkit-text-size-adjust: 100%;
+        }
+
         body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font: 400 0.9375rem/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", sans-serif;
             display: grid;
-            grid-template-columns: 1fr min(65rem, 90%) 1fr;
-            max-width: none;
+            grid-template-columns: 1fr min(48rem, calc(100% - 2.5rem)) 1fr;
+            row-gap: 0;
+            min-height: 100dvh;
+            font-feature-settings: "kern" 1, "liga" 1;
         }
 
-        body > * {
-            grid-column: 2;
+        body > * { grid-column: 2; }
+
+        a { color: var(--link); text-decoration: none; }
+        a:hover { color: var(--link-hover); text-decoration: underline; }
+
+        mark {
+            background: var(--mark);
+            color: inherit;
+            padding: 0 0.15em;
+            border-radius: 2px;
         }
 
-        body > footer {
-            padding: 0.25em;
+        /* HEADER */
+        header.top {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            align-items: center;
+            gap: 1.25rem;
+            padding: 1.25rem 0 1.5rem;
         }
 
-        body > header {
-            padding-bottom: 0;
+        .brand {
+            font-size: 1.1rem;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            color: var(--text);
         }
+        .brand:hover { color: var(--text); text-decoration: none; }
 
-        blockquote {
-            font-size: 1rem;
-            margin-top: 1em;
+        .search {
+            display: flex;
+            align-items: center;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-pill);
+            padding: 0.5rem 0.75rem 0.5rem 1rem;
+            box-shadow: var(--shadow-sm);
+            transition: border-color 120ms ease, box-shadow 120ms ease;
         }
-
-        header form {
-            margin: 0 auto;
+        .search:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-soft);
         }
-
-        h1 {
-            float: left;
-            font-size: 1.25rem;
+        .search input {
+            flex: 1;
+            border: 0;
+            background: transparent;
+            outline: 0;
+            font: inherit;
+            color: var(--text);
+            padding: 0.15rem 0.25rem;
         }
-
-        h1 a {
-            text-decoration: none;
-            font-weight: normal;
-        }
-
-        label {
-            display: inline-block;
-            padding-top: 0.25em;
-        }
-
-        ol {
-            margin-top: 0;
-        }
-
-        ol li {
-            margin-bottom: 1em;
-        }
-
-        li h4 {
-            margin: 0;
-        }
-
-        li small {
-            color: grey;
-        }
-
-        .pill {
-            display: inline-block;
-            padding: 0 0.4em;
-            margin-left: 0.4em;
-            font-size: 0.7rem;
-            line-height: 1.4;
-            border-radius: 10px;
-            color: white;
-            vertical-align: middle;
-            font-family: monospace;
-        }
-        .pill.s2 { background: #2e8b57; }
-        .pill.s3 { background: #4a90e2; }
-        .pill.s4 { background: #e58e26; }
-        .pill.s5 { background: #c0392b; }
-        .pill.s0 { background: #888; }
-        .pill.state-pending { background: #aaa; }
-        .pill.state-indexed { background: #6c757d; }
-
-        li .actions {
-            display: inline-block;
-            margin-left: 0.5em;
-            visibility: hidden;
-            font-size: 0.85rem;
-        }
-
-        li:hover .actions,
-        li:focus-within .actions {
-            visibility: visible;
-        }
-
-        li .actions form {
-            display: inline;
-            margin: 0;
-        }
-
-        li .actions button {
-            background: none;
-            border: 1px solid #ccc;
-            border-radius: 3px;
-            padding: 0.1em 0.5em;
-            margin: 0 0.1em;
-            font-size: 0.85rem;
+        .search input::placeholder { color: var(--text-subtle); }
+        .search button {
+            border: 0;
+            background: transparent;
+            padding: 0.25rem 0.4rem;
+            color: var(--text-muted);
             cursor: pointer;
-            color: #555;
+            display: inline-flex;
+            align-items: center;
+            border-radius: var(--radius-pill);
         }
+        .search button:hover { color: var(--link); }
 
-        li .actions button:hover {
-            background: #f0f0f0;
-        }
-
-        li .actions input[type="url"] {
+        .help-link {
+            color: var(--text-muted);
             font-size: 0.85rem;
-            padding: 0.1em 0.3em;
-            width: 24em;
-        }
-
-        p {
-            margin-top: 0.5em;
-        }
-
-        .layout {
-            display: grid;
-            grid-template-columns: 200px minmax(0, 1fr);
-            gap: 1.5em;
-            align-items: start;
-        }
-
-        .sidebar {
-            font-size: 0.9rem;
-            float: none;
-            max-width: none;
-            width: auto;
-            margin: 0;
-            padding: 0.5em 0.75em;
-            background: var(--accent-bg, #f5f7ff);
-            border: 1px solid #e0e0e0;
-            border-radius: 5px;
-            box-sizing: border-box;
-        }
-
-        .sidebar h5 {
-            margin: 0 0 0.4em 0;
+            background: transparent;
+            border: 0;
+            padding: 0.25rem 0.5rem;
+            cursor: pointer;
+            border-radius: var(--radius-sm);
+            font: inherit;
             font-size: 0.85rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #666;
-            white-space: nowrap;
+        }
+        .help-link:hover { color: var(--text); background: var(--surface-soft); }
+
+        /* INDEXING BANNER */
+        #indexing-status {
+            grid-column: 1 / -1;
+            background: var(--accent-soft);
+            color: oklch(0.35 0.15 255);
+            padding: 0.4rem 1rem;
+            font-size: 0.825rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
         }
 
-        .sidebar ul {
+        /* FILTER ROW */
+        .filters {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.4rem 0.6rem;
+            padding: 0.5rem 0 1.25rem;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 1.25rem;
+            font-size: 0.85rem;
+        }
+        .filters-label {
+            color: var(--text-muted);
+            font-weight: 500;
+            margin-right: 0.25rem;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.2rem 0.65rem;
+            border-radius: var(--radius-pill);
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid transparent;
+            font-size: 0.82rem;
+            line-height: 1.4;
+            transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+        }
+        .chip:hover {
+            background: var(--surface-soft);
+            color: var(--text);
+            text-decoration: none;
+        }
+        .chip.active {
+            background: var(--surface);
+            border-color: var(--border-strong);
+            color: var(--text);
+            font-weight: 500;
+        }
+        .chip-count {
+            color: var(--text-subtle);
+            font-variant-numeric: tabular-nums;
+            font-size: 0.78rem;
+        }
+        .chip.active .chip-count { color: var(--text-muted); }
+
+        /* RESULT SUMMARY LINE */
+        .summary {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin: 0 0 1.25rem;
+        }
+
+        /* RESULTS */
+        ol.results {
             list-style: none;
             padding: 0;
-            margin: 0 0 1em 0;
+            margin: 0 0 3rem;
+        }
+        ol.results > li {
+            padding: 0.5rem 0 1.5rem;
+            border-radius: var(--radius-md);
+            position: relative;
+        }
+        ol.results > li + li {
+            margin-top: 0.25rem;
+        }
+        ol.results > li.kb-selected {
+            background: var(--accent-soft);
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+            margin-left: -0.75rem;
+            margin-right: -0.75rem;
         }
 
-        .sidebar li {
-            padding: 0.15em 0;
+        .meta-line {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 0.2rem;
+            min-height: 1.25rem;
+        }
+        .meta-line .host {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        .meta-line .url {
+            color: var(--text-subtle);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+            min-width: 0;
+        }
+        .meta-line .ct-icon {
+            font-size: 0.95rem;
+            line-height: 1;
         }
 
-        .sidebar a {
-            text-decoration: none;
-            color: inherit;
+        .result-title {
+            margin: 0 0 0.25rem;
+            font-size: 1.05rem;
+            font-weight: 500;
+            line-height: 1.35;
+            letter-spacing: -0.005em;
         }
-
-        .sidebar a:hover {
+        .result-title a {
+            color: var(--link);
+        }
+        .result-title a:visited {
+            color: var(--link-visited);
+        }
+        .result-title a:hover {
             text-decoration: underline;
         }
 
-        .sidebar a.active {
-            font-weight: bold;
+        .snippet {
+            margin: 0;
+            color: var(--text);
+            font-size: 0.9rem;
+            line-height: 1.6;
+            max-width: 65ch;
         }
 
-        .sidebar .count {
-            color: #888;
-            font-size: 0.8rem;
-            margin-left: 0.3em;
+        /* PILLS */
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            font-size: 0.7rem;
+            line-height: 1.4;
+            padding: 0.05rem 0.45rem;
+            border-radius: var(--radius-pill);
+            font-variant-numeric: tabular-nums;
+            font-weight: 500;
+            letter-spacing: 0.01em;
         }
-
-        @media (max-width: 700px) {
-            .layout { grid-template-columns: 1fr; }
+        .pill.s2 { background: oklch(0.95 0.04 150); color: oklch(0.38 0.1 150); }
+        .pill.s3 { background: oklch(0.95 0.04 245); color: oklch(0.4 0.13 245); }
+        .pill.s4 { background: oklch(0.95 0.05 70);  color: oklch(0.42 0.14 70); }
+        .pill.s5 { background: oklch(0.95 0.05 28);  color: oklch(0.45 0.16 28); }
+        .pill.s0 { background: oklch(0.94 0 0);     color: oklch(0.45 0 0); }
+        .pill.state-pending {
+            background: transparent;
+            color: var(--text-subtle);
+            border: 1px dashed var(--border-strong);
+            padding: 0 0.4rem;
         }
+        /* "indexed" is the default; no pill rendered for it. */
 
-        ol li.kb-selected {
-            outline: 2px solid #4a90e2;
-            outline-offset: 4px;
-            border-radius: 3px;
+        /* ROW ACTIONS */
+        .row-actions {
+            display: flex;
+            gap: 0.25rem;
+            margin-left: auto;
+            opacity: 0;
+            transition: opacity 120ms ease;
         }
+        ol.results > li:hover .row-actions,
+        ol.results > li:focus-within .row-actions,
+        ol.results > li.kb-selected .row-actions {
+            opacity: 1;
+        }
+        .row-actions form { margin: 0; display: contents; }
+        .row-actions button {
+            background: transparent;
+            border: 0;
+            padding: 0.1rem 0.45rem;
+            font: inherit;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: var(--radius-sm);
+        }
+        .row-actions button:hover {
+            background: var(--surface-soft);
+            color: var(--text);
+        }
+        .row-actions button[data-danger]:hover {
+            background: oklch(0.95 0.05 28);
+            color: oklch(0.45 0.16 28);
+        }
+        .row-actions button:disabled { opacity: 0.6; cursor: progress; }
 
+        /* KEYBOARD HELP */
         #kb-help {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.5);
+            background: oklch(0.2 0.02 250 / 0.45);
             display: none;
             align-items: center;
             justify-content: center;
             z-index: 100;
+            padding: 1.5rem;
+            backdrop-filter: blur(1px);
         }
-
-        #kb-help[hidden] {
-            display: none !important;
-        }
-
-        #kb-help.visible {
-            display: flex;
-        }
-
+        #kb-help[hidden] { display: none !important; }
+        #kb-help.visible { display: flex; }
         #kb-help .panel {
-            background: white;
-            padding: 1.5em 2em;
-            border-radius: 6px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-            min-width: 320px;
-            font-size: 0.95rem;
-        }
-
-        #kb-help h3 {
-            margin: 0 0 0.8em 0;
-        }
-
-        #kb-help table {
-            border-collapse: collapse;
-        }
-
-        #kb-help td {
-            padding: 0.2em 0.6em 0.2em 0;
-        }
-
-        #kb-help kbd {
-            background: #f0f0f0;
-            border: 1px solid #ccc;
-            border-radius: 3px;
-            padding: 0.1em 0.4em;
-            font-family: monospace;
-            font-size: 0.85rem;
-        }
-
-        #indexing-status {
-            grid-column: 1 / -1;
-            background: #fff3a3;
-            color: #333;
-            padding: 0.5em 1em;
-            border-bottom: 1px solid #e0c84a;
+            background: var(--surface);
+            padding: 1.5rem 1.75rem;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-md);
+            min-width: 340px;
+            max-width: 28rem;
             font-size: 0.9rem;
-            text-align: center;
+        }
+        #kb-help h3 {
+            margin: 0 0 0.85rem;
+            font-size: 0.95rem;
+            font-weight: 600;
+            letter-spacing: -0.005em;
+        }
+        #kb-help table { border-collapse: collapse; width: 100%; }
+        #kb-help td { padding: 0.25rem 0.5rem 0.25rem 0; vertical-align: middle; }
+        #kb-help td:last-child { color: var(--text-muted); }
+        kbd {
+            background: var(--surface-soft);
+            border: 1px solid var(--border-strong);
+            border-bottom-width: 1.5px;
+            border-radius: 4px;
+            padding: 0.05rem 0.4rem;
+            font: 500 0.78rem/1 ui-monospace, "SF Mono", "Menlo", monospace;
+            color: var(--text);
         }
 
+        /* FOOTER */
+        footer.bottom {
+            color: var(--text-subtle);
+            font-size: 0.8rem;
+            padding: 2rem 0 1.5rem;
+            border-top: 1px solid var(--border);
+        }
+        footer.bottom a { color: var(--text-muted); }
+
+        /* RESPONSIVE */
+        @media (max-width: 640px) {
+            header.top {
+                grid-template-columns: auto 1fr;
+                row-gap: 0.5rem;
+            }
+            header.top .search { grid-column: 1 / -1; }
+            .help-link { grid-row: 1; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            * { transition: none !important; animation: none !important; }
+        }
     </style>
 </head>
 <body>
-<header>
-    <h1><a href="/">Fafi</a></h1>
-    <form action="/">
-        <label><input type="text" name="q" value="{{.Query}}" size=24 placeholder="Bookmark search"></label>
-        <input type="submit" name="search" value="Search">
+
+<header class="top">
+    <a class="brand" href="/">Fafi</a>
+    <form class="search" action="/" role="search">
+        <input type="search" name="q" value="{{.Query}}" placeholder="Search bookmarks" aria-label="Search bookmarks" autocomplete="off">
+        <button type="submit" aria-label="Search">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7"></circle>
+                <path d="m20 20-3.5-3.5"></path>
+            </svg>
+        </button>
     </form>
+    <button class="help-link" type="button" data-help-toggle title="Keyboard shortcuts (?)">?</button>
 </header>
+
 <div id="indexing-status" hidden>
     Indexing <span id="indexing-done">0</span> of <span id="indexing-total">0</span>&hellip;
 </div>
 
-<p>
-    {{ if .Query }}
-    <small>You searched for
-        <mark>{{.Query}}</mark>
-        .
-    </small>
-    {{ end }}
-</p>
+<nav class="filters" aria-label="Filter by HTTP status">
+    <span class="filters-label">Status</span>
+    <a class="chip{{if eq .Status ""}} active{{end}}" href="{{filterURL .Query ""}}">All</a>
+    <a class="chip{{if eq .Status "2xx"}} active{{end}}" href="{{filterURL .Query "2xx"}}"><span class="pill s2">2xx</span><span class="chip-count">{{.StatusCounts.S2xx}}</span></a>
+    <a class="chip{{if eq .Status "3xx"}} active{{end}}" href="{{filterURL .Query "3xx"}}"><span class="pill s3">3xx</span><span class="chip-count">{{.StatusCounts.S3xx}}</span></a>
+    <a class="chip{{if eq .Status "4xx"}} active{{end}}" href="{{filterURL .Query "4xx"}}"><span class="pill s4">4xx</span><span class="chip-count">{{.StatusCounts.S4xx}}</span></a>
+    <a class="chip{{if eq .Status "5xx"}} active{{end}}" href="{{filterURL .Query "5xx"}}"><span class="pill s5">5xx</span><span class="chip-count">{{.StatusCounts.S5xx}}</span></a>
+    <a class="chip{{if eq .Status "none"}} active{{end}}" href="{{filterURL .Query "none"}}"><span class="pill s0">none</span><span class="chip-count">{{.StatusCounts.None}}</span></a>
+</nav>
 
-<div class="layout">
-<div class="sidebar">
-    <h5>HTTP Status</h5>
-    <ul>
-        <li><a href="{{filterURL .Query ""}}"{{if eq .Status ""}} class="active"{{end}}>All</a></li>
-        <li><a href="{{filterURL .Query "2xx"}}"{{if eq .Status "2xx"}} class="active"{{end}}><span class="pill s2">2xx</span><span class="count">{{.StatusCounts.S2xx}}</span></a></li>
-        <li><a href="{{filterURL .Query "3xx"}}"{{if eq .Status "3xx"}} class="active"{{end}}><span class="pill s3">3xx</span><span class="count">{{.StatusCounts.S3xx}}</span></a></li>
-        <li><a href="{{filterURL .Query "4xx"}}"{{if eq .Status "4xx"}} class="active"{{end}}><span class="pill s4">4xx</span><span class="count">{{.StatusCounts.S4xx}}</span></a></li>
-        <li><a href="{{filterURL .Query "5xx"}}"{{if eq .Status "5xx"}} class="active"{{end}}><span class="pill s5">5xx</span><span class="count">{{.StatusCounts.S5xx}}</span></a></li>
-        <li><a href="{{filterURL .Query "none"}}"{{if eq .Status "none"}} class="active"{{end}}><span class="pill s0">none</span><span class="count">{{.StatusCounts.None}}</span></a></li>
-    </ul>
-</div>
-<ol>
+{{ if .Query }}
+<p class="summary">Results for <mark>{{.Query}}</mark></p>
+{{ end }}
+
+<ol class="results">
     {{range .Bookmarks}}
     <li data-url="{{.URL}}">
-        <h4>{{$icon := contentTypeIcon .ContentType}}{{if $icon}}<span class="ct-icon" data-ct-icon title="{{.ContentType}}">{{$icon}}</span> {{end}}<a href="{{.URL}}" data-title-link>{{.Title}}</a></h4>
-        <small data-url-text>{{.URL}}</small><span data-pills>{{ if .StatusCode.Valid }}<span class="pill {{statusClass .StatusCode.Int64}}" title="HTTP status">{{.StatusCode.Int64}}</span>{{ end }}{{ if .IsScraped.Valid }}{{ if .IsScraped.Bool }}<span class="pill state-indexed">indexed</span>{{ else }}<span class="pill state-pending">pending</span>{{ end }}{{ else }}<span class="pill state-pending">pending</span>{{ end }}</span>
-        <span class="actions">
-            <form method="post" action="/reindex" data-reindex>
-                <input type="hidden" name="url" value="{{.URL}}">
-                <button type="submit" title="Re-fetch content and update title/text">Reindex</button>
-            </form>
-            <form method="post" action="/edit" onsubmit="return editPrompt(this)">
-                <input type="hidden" name="url" value="{{.URL}}">
-                <input type="hidden" name="new_url" value="">
-                <button type="submit" title="Edit URL">Edit</button>
-            </form>
-            <form method="post" action="/delete" data-delete>
-                <input type="hidden" name="url" value="{{.URL}}">
-                <button type="submit" title="Soft delete: hide from search and block re-import">Delete</button>
-            </form>
-        </span>
+        <div class="meta-line">
+            {{$icon := contentTypeIcon .ContentType}}{{if $icon}}<span class="ct-icon" data-ct-icon title="{{.ContentType}}">{{$icon}}</span>{{end}}
+            <span class="url" data-url-text>{{.URL}}</span>
+            <span class="pills" data-pills>{{ if .StatusCode.Valid }}<span class="pill {{statusClass .StatusCode.Int64}}" title="HTTP status">{{.StatusCode.Int64}}</span>{{ end }}{{ if and .IsScraped.Valid (not .IsScraped.Bool) }}<span class="pill state-pending">pending</span>{{ end }}{{ if not .IsScraped.Valid }}<span class="pill state-pending">pending</span>{{ end }}</span>
+            <span class="row-actions">
+                <form method="post" action="/reindex" data-reindex>
+                    <input type="hidden" name="url" value="{{.URL}}">
+                    <button type="submit" title="Re-fetch content and update title/text">Reindex</button>
+                </form>
+                <form method="post" action="/edit" onsubmit="return editPrompt(this)">
+                    <input type="hidden" name="url" value="{{.URL}}">
+                    <input type="hidden" name="new_url" value="">
+                    <button type="submit" title="Edit URL">Edit</button>
+                </form>
+                <form method="post" action="/delete" data-delete>
+                    <input type="hidden" name="url" value="{{.URL}}">
+                    <button type="submit" data-danger title="Soft delete: hide from search and block re-import">Delete</button>
+                </form>
+            </span>
+        </div>
+        <h3 class="result-title"><a href="{{.URL}}" data-title-link>{{.Title}}</a></h3>
         {{ if .Text }}
-        <blockquote>{{ runeSnippet .Text 320 }}</blockquote>
+        <p class="snippet">{{ runeSnippet .Text 320 }}</p>
         {{ end }}
     </li>
     {{end}}
 </ol>
-</div>
 
 <div id="kb-help" hidden>
     <div class="panel" role="dialog" aria-label="Keyboard shortcuts">
@@ -323,15 +463,15 @@
             <tr><td><kbd>j</kbd> / <kbd>↓</kbd></td><td>Next result</td></tr>
             <tr><td><kbd>k</kbd> / <kbd>↑</kbd></td><td>Previous result</td></tr>
             <tr><td><kbd>Enter</kbd></td><td>Open the selected result</td></tr>
-            <tr><td><kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Enter</kbd></td><td>Open in new tab</td></tr>
+            <tr><td><kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>Enter</kbd></td><td>Open in new tab</td></tr>
             <tr><td><kbd>?</kbd></td><td>Toggle this help</td></tr>
-            <tr><td><kbd>Esc</kbd></td><td>Close this help</td></tr>
         </table>
     </div>
 </div>
 
-<footer><small><em><a href="https://github.com/svandragt/fafi/">Fafi</a> -- Web content indexing and search
-    tool.</em></small></footer>
+<footer class="bottom">
+    <a href="https://github.com/svandragt/fafi/">Fafi</a> — web content indexing and search tool
+</footer>
 
 <script>
     (function () {
@@ -349,9 +489,7 @@
                 status.hidden = true;
             }
         };
-        window.addEventListener('pagehide', function () {
-            es.close();
-        });
+        window.addEventListener('pagehide', function () { es.close(); });
     })();
 
     document.addEventListener('submit', function (e) {
@@ -373,7 +511,7 @@
         const button = form.querySelector('button');
         const originalLabel = button.textContent;
         button.disabled = true;
-        button.textContent = 'Reindexing…';
+        button.textContent = '…';
         li.style.opacity = '0.6';
 
         const body = new URLSearchParams(new FormData(form));
@@ -391,25 +529,21 @@
     function updateRow(li, data) {
         li.dataset.url = data.url;
         const link = li.querySelector('[data-title-link]');
-        if (link) {
-            link.href = data.url;
-            link.textContent = data.title || data.url;
-        }
+        if (link) { link.href = data.url; link.textContent = data.title || data.url; }
         const urlText = li.querySelector('[data-url-text]');
         if (urlText) urlText.textContent = data.url;
         const ctIcon = li.querySelector('[data-ct-icon]');
         if (ctIcon) ctIcon.title = data.content_type || '';
-        // Rebuild pills.
         const pills = li.querySelector('[data-pills]');
         if (pills) {
             pills.innerHTML = '';
             if (data.has_status) {
                 pills.appendChild(makePill(statusClassFor(data.status_code), String(data.status_code), 'HTTP status'));
             }
-            pills.appendChild(makePill(data.indexed ? 'state-indexed' : 'state-pending', data.indexed ? 'indexed' : 'pending'));
+            if (!data.indexed) {
+                pills.appendChild(makePill('state-pending', 'pending'));
+            }
         }
-        // Keep the per-row form's hidden url in sync so a second reindex
-        // targets the (possibly redirected) new URL.
         li.querySelectorAll('input[name="url"]').forEach(i => { i.value = data.url; });
     }
 
@@ -432,11 +566,10 @@
     (function setupKeyboardShortcuts() {
         const searchInput = document.querySelector('input[name="q"]');
         const helpEl = document.getElementById('kb-help');
+        const helpToggle = document.querySelector('[data-help-toggle]');
         let selectedIndex = -1;
 
-        function results() {
-            return Array.from(document.querySelectorAll('ol > li'));
-        }
+        function results() { return Array.from(document.querySelectorAll('ol.results > li')); }
 
         function setSelected(index) {
             const items = results();
@@ -470,9 +603,9 @@
         helpEl.addEventListener('click', function (e) {
             if (e.target === helpEl) toggleHelp(false);
         });
+        if (helpToggle) helpToggle.addEventListener('click', () => toggleHelp(true));
 
         document.addEventListener('keydown', function (e) {
-            // Help overlay handling.
             if (!helpEl.hasAttribute('hidden')) {
                 if (e.key === 'Escape' || e.key === '?') {
                     e.preventDefault();
@@ -481,15 +614,10 @@
                 return;
             }
 
-            // Search input has its own Esc behaviour; other shortcuts skipped
-            // while typing.
             if (isEditable(document.activeElement)) {
                 if (e.key === 'Escape' && document.activeElement === searchInput) {
-                    if (searchInput.value !== '') {
-                        searchInput.value = '';
-                    } else {
-                        searchInput.blur();
-                    }
+                    if (searchInput.value !== '') { searchInput.value = ''; }
+                    else { searchInput.blur(); }
                     e.preventDefault();
                 }
                 return;
@@ -518,14 +646,11 @@
                 case 'Enter':
                     if (selectedIndex >= 0) {
                         const items = results();
-                        const link = items[selectedIndex] && items[selectedIndex].querySelector('h4 a');
+                        const link = items[selectedIndex] && items[selectedIndex].querySelector('.result-title a');
                         if (link) {
                             e.preventDefault();
-                            if (e.ctrlKey || e.metaKey) {
-                                window.open(link.href, '_blank');
-                            } else {
-                                window.location.href = link.href;
-                            }
+                            if (e.ctrlKey || e.metaKey) { window.open(link.href, '_blank'); }
+                            else { window.location.href = link.href; }
                         }
                     }
                     break;
@@ -536,9 +661,7 @@
     function editPrompt(form) {
         const current = form.elements['url'].value;
         const next = window.prompt('Edit URL:', current);
-        if (next === null || next.trim() === '' || next === current) {
-            return false;
-        }
+        if (next === null || next.trim() === '' || next === current) { return false; }
         form.elements['new_url'].value = next.trim();
         return true;
     }
