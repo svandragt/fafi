@@ -13,6 +13,10 @@ type Bookmark struct {
 	IsScraped   sql.NullBool
 	DateAdded   SqlTime
 	StatusCode  sql.NullInt64
+	// TitleHL and URLHL carry match markers (\x02/\x03) for search highlighting.
+	// Empty in browse mode; the template falls back to the plain fields then.
+	TitleHL string
+	URLHL   string
 }
 
 type SqlTime time.Time

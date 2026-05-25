@@ -438,7 +438,13 @@
 </nav>
 
 {{ if .Query }}
-<p class="summary">Results for <mark>{{.Query}}</mark></p>
+<p class="summary">
+    {{ if eq .ResultCount 0 }}
+        No matches for <mark>{{.Query}}</mark>. Try fewer or different words.
+    {{ else }}
+        {{.ResultCount}} result{{ if ne .ResultCount 1 }}s{{ end }} for <mark>{{.Query}}</mark> in {{.ElapsedMs}} ms
+    {{ end }}
+</p>
 {{ end }}
 
 <ol class="results">
@@ -446,7 +452,7 @@
     <li data-url="{{.URL}}">
         <div class="meta-line">
             {{$icon := contentTypeIcon .ContentType}}{{if $icon}}<span class="ct-icon" data-ct-icon title="{{.ContentType}}">{{$icon}}</span>{{end}}
-            <span class="url" data-url-text>{{.URL}}</span>
+            <span class="url" data-url-text>{{ if .URLHL }}{{ highlightSnippet .URLHL 200 }}{{ else }}{{.URL}}{{ end }}</span>
             <span class="pills" data-pills>{{ if .StatusCode.Valid }}<span class="pill {{statusClass .StatusCode.Int64}}" title="HTTP status">{{.StatusCode.Int64}}</span>{{ end }}{{ if and .IsScraped.Valid (not .IsScraped.Bool) }}<span class="pill state-pending">pending</span>{{ end }}{{ if not .IsScraped.Valid }}<span class="pill state-pending">pending</span>{{ end }}</span>
             <span class="row-actions">
                 <form method="post" action="/reindex" data-reindex>
@@ -464,7 +470,7 @@
                 </form>
             </span>
         </div>
-        <h3 class="result-title"><a href="{{.URL}}" data-title-link>{{.Title}}</a></h3>
+        <h3 class="result-title"><a href="{{.URL}}" data-title-link>{{ if .TitleHL }}{{ highlightSnippet .TitleHL 200 }}{{ else }}{{.Title}}{{ end }}</a></h3>
         {{ if .Text }}
         <p class="snippet" data-snippet title="Click to read full text">{{ highlightSnippet .Text 320 }}</p>
         {{ end }}

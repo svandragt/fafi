@@ -660,22 +660,58 @@ func (r *Database) allV2(keywords string) ([]Bookmark, error) {
 	return r.allV2Filtered(keywords, "")
 }
 
-// sanitizeFTSQuery replaces characters the FTS5 query parser treats as
-// punctuation/operators with spaces so user input like "lidarr.audio" or
-// "github.com/foo" tokenises into searchable terms (lidarr AND audio).
-// Quotes are stripped to avoid unterminated phrase-query errors.
+// sanitizeFTSQuery rewrites user input into a safe FTS5 query.
+//
+//   - Balanced double quotes are preserved so phrase queries work
+//     (`"react hooks"` stays a phrase, not two AND'd tokens).
+//   - Outside quotes, FTS5-significant punctuation is replaced with spaces so
+//     `lidarr.audio` tokenises to `lidarr audio`.
+//   - The final unquoted token gets a `*` prefix suffix so partial typing
+//     matches ("lidar" → "lidar*" matches "lidarr"). Skipped when the token
+//     is shorter than 2 chars or already ends in `*`.
+//
+// If quotes are unbalanced we strip them entirely to avoid an FTS5 syntax
+// error.
 func sanitizeFTSQuery(q string) string {
+	balanced := strings.Count(q, `"`)%2 == 0
 	var b strings.Builder
-	b.Grow(len(q))
+	b.Grow(len(q) + 2)
+	inQuote := false
 	for _, r := range q {
+		if r == '"' {
+			if balanced {
+				b.WriteRune(r)
+				inQuote = !inQuote
+			}
+			continue
+		}
+		if inQuote {
+			b.WriteRune(r)
+			continue
+		}
 		switch r {
-		case '.', '/', ':', '?', '#', '&', '=', '+', '%', '\\', '"', '\'', '(', ')', '[', ']', '{', '}', '<', '>', ',', ';', '!', '@', '|', '~', '`', '^', '*':
+		case '.', '/', ':', '?', '#', '&', '=', '+', '%', '\\', '\'', '(', ')', '[', ']', '{', '}', '<', '>', ',', ';', '!', '@', '|', '~', '`', '^', '*':
 			b.WriteByte(' ')
 		default:
 			b.WriteRune(r)
 		}
 	}
-	return strings.Join(strings.Fields(b.String()), " ")
+	q = strings.Join(strings.Fields(b.String()), " ")
+	if q == "" {
+		return q
+	}
+	// Prefix-complete the last token unless the query uses a phrase (quotes
+	// would break our naïve token boundary), the last token already ends in
+	// `*`, or it's too short to be useful.
+	if !strings.Contains(q, `"`) {
+		tokens := strings.Fields(q)
+		last := tokens[len(tokens)-1]
+		if !strings.HasSuffix(last, "*") && len([]rune(last)) >= 2 {
+			tokens[len(tokens)-1] = last + "*"
+			q = strings.Join(tokens, " ")
+		}
+	}
+	return q
 }
 
 func (r *Database) allV2Filtered(keywords, statusFilter string) ([]Bookmark, error) {
@@ -694,12 +730,14 @@ func (r *Database) allV2Filtered(keywords, statusFilter string) ([]Bookmark, err
 				snippet(bookmarks, 2, ?, ?, '...', 64) as text,
 				content_type,
 				isScraped,
-				dateAdded
+				dateAdded,
+				highlight(bookmarks, 1, ?, ?) as title_hl,
+				highlight(bookmarks, 0, ?, ?) as url_hl
 			FROM bookmarks
 			WHERE text is not '' AND bookmarks MATCH ?`+filterClause+`
-			ORDER BY bm25(bookmarks, 1.0, 3.0, 1.0, 1.0, 1.0, 1.0)
+			ORDER BY bm25(bookmarks, 1.5, 3.0, 1.0, 1.0, 1.0, 1.0)
 			LIMIT ?`,
-			"\x02", "\x03", keywords, 50,
+			"\x02", "\x03", "\x02", "\x03", "\x02", "\x03", keywords, 50,
 		)
 	} else {
 		rows, err = r.db.Query(
@@ -719,8 +757,21 @@ func (r *Database) allV2Filtered(keywords, statusFilter string) ([]Bookmark, err
 	for rows.Next() {
 		var bm Bookmark
 		var ct sql.NullString
-		if err := rows.Scan(&bm.URL, &bm.Title, &bm.Text, &ct, &bm.IsScraped, &bm.DateAdded); err != nil {
-			return nil, err
+		var titleHL, urlHL sql.NullString
+		if keywords != "" {
+			if err := rows.Scan(&bm.URL, &bm.Title, &bm.Text, &ct, &bm.IsScraped, &bm.DateAdded, &titleHL, &urlHL); err != nil {
+				return nil, err
+			}
+			if titleHL.Valid {
+				bm.TitleHL = titleHL.String
+			}
+			if urlHL.Valid {
+				bm.URLHL = urlHL.String
+			}
+		} else {
+			if err := rows.Scan(&bm.URL, &bm.Title, &bm.Text, &ct, &bm.IsScraped, &bm.DateAdded); err != nil {
+				return nil, err
+			}
 		}
 		if ct.Valid {
 			bm.ContentType = ct.String

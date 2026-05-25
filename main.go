@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 // contentTypeIcon returns a category icon for a MIME type, or "" for text/HTML
@@ -44,10 +45,12 @@ func contentTypeIcon(ct string) string {
 var indexProgress = progress.New()
 
 type TemplateData struct {
-	Bookmarks      []bookmark.Bookmark
-	Query          string
-	Status         string
-	StatusCounts   bookmark.StatusCounts
+	Bookmarks    []bookmark.Bookmark
+	Query        string
+	Status       string
+	StatusCounts bookmark.StatusCounts
+	ResultCount  int
+	ElapsedMs    int64
 }
 
 //go:embed pub/index.html
@@ -268,7 +271,9 @@ func bootEnvironment() {
 func handleIndex(w http.ResponseWriter, r *http.Request) {
 	keywords := getSearchQuery(w, r)
 	statusFilter := r.URL.Query().Get("status")
+	start := time.Now()
 	bookmarks, err := bookmark.BmDb.AllFiltered(keywords, statusFilter)
+	elapsed := time.Since(start)
 	if err != nil {
 		// A malformed FTS query in ?q= can cause this; don't take the
 		// server down with the request.
@@ -287,6 +292,8 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		Query:        keywords,
 		Status:       statusFilter,
 		StatusCounts: counts,
+		ResultCount:  len(bookmarks),
+		ElapsedMs:    elapsed.Milliseconds(),
 	}
 	if err := indexTpl.Execute(w, data); err != nil {
 		log.Println("Template execute error:", err)
