@@ -15,6 +15,37 @@ This is how it looks:
 
 ![image](https://github.com/svandragt/fafi/assets/594871/c7f9a06c-fa2a-430b-a9be-2bc66b0615d3)
 
+## Searching
+
+The search box accepts plain words plus a few extras:
+
+* **Phrase queries** — wrap words in double quotes: `"react hooks"`.
+* **Prefix queries** — the last unquoted token is auto-prefixed, so `lidar` also matches `lidarr`. Add an explicit `*` (e.g. `desig*`) to control where prefixing applies.
+* **Domain queries** — paste a URL or host (e.g. `lidarr.audio`); punctuation is split into tokens so it still matches.
+* **Porter stemming** — `design` matches `designs`, `designed`, `designing`. Powered by the FTS5 `porter unicode61` tokenizer.
+* **Highlighting** — matched terms are highlighted in titles, URLs, and snippets. Click a snippet to expand the full extracted text.
+* Results are filtered by HTTP status with the chips above the list (2xx / 3xx / 4xx / 5xx / none).
+
+## Keyboard shortcuts
+
+Press <kbd>?</kbd> in the UI for the full list. Currently:
+
+| Key | Action |
+| --- | --- |
+| <kbd>/</kbd> | Focus the search box |
+| <kbd>Esc</kbd> | Clear search, then blur |
+| <kbd>j</kbd> / <kbd>↓</kbd> | Next result |
+| <kbd>k</kbd> / <kbd>↑</kbd> | Previous result |
+| <kbd>Enter</kbd> | Open the selected result |
+| <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Enter</kbd> | Open in new tab |
+| <kbd>?</kbd> | Toggle the shortcut help |
+
+## Managing bookmarks
+
+Each row has inline actions:
+
+* **Reindex** — re-fetches the page and refreshes the stored title/text.
+* **Delete** — soft-deletes the bookmark. Soft-deleted entries are hidden and blocked from re-import (e.g. on the next Firefox sync), so accidental re-adds don't bring them back.
 
 ## Environment variables
 
