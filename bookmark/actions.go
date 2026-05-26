@@ -38,6 +38,10 @@ func index(bm Bookmark, overwrite bool) {
 		if sErr := bmDb.UpsertStatus(sourceUrl, status); sErr != nil {
 			log.Println("UpsertStatus error:", sErr)
 		}
+	} else {
+		if sErr := bmDb.RecordFailure(sourceUrl); sErr != nil {
+			log.Println("RecordFailure error:", sErr)
+		}
 	}
 	if err != nil {
 		log.Println("Probe error:", err)
@@ -171,6 +175,10 @@ func RefreshAllStatuses(progressInc func()) {
 				if err := BmDb.UpsertStatus(u, status); err != nil {
 					log.Println("RefreshAllStatuses upsert error:", err)
 				}
+			} else {
+				if err := BmDb.RecordFailure(u); err != nil {
+					log.Println("RefreshAllStatuses RecordFailure error:", err)
+				}
 			}
 			if progressInc != nil {
 				progressInc()
@@ -206,6 +214,10 @@ func RefreshMissingStatuses(progressInc func()) {
 			if status != 0 {
 				if err := BmDb.UpsertStatus(u, status); err != nil {
 					log.Println("RefreshMissingStatuses upsert error:", err)
+				}
+			} else {
+				if err := BmDb.RecordFailure(u); err != nil {
+					log.Println("RefreshMissingStatuses RecordFailure error:", err)
 				}
 			}
 			if progressInc != nil {

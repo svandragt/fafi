@@ -251,6 +251,208 @@ func TestMigrateV2toV3_DedupSweep(t *testing.T) {
 	}
 }
 
+func TestErrBucket_CountsAndFilter(t *testing.T) {
+	db := openTestDB(t)
+	r := NewDatabase(db)
+	withGlobalBmDb(t, r)
+	if err := r.MigrateSchema(); err != nil {
+		t.Fatal(err)
+	}
+	ok := "https://example.com/ok"
+	bad := "https://example.com/dns-fail"
+	if _, err := r.CreateOrGet(Bookmark{URL: ok, Title: "ok", Text: "body"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.CreateOrGet(Bookmark{URL: bad, Title: "bad"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.UpsertStatus(ok, 200); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.RecordFailure(bad); err != nil {
+		t.Fatal(err)
+	}
+
+	counts, err := r.CountStatuses()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if counts.Err != 1 {
+		t.Errorf("Err count = %d, want 1", counts.Err)
+	}
+	if counts.None != 0 {
+		t.Errorf("None count = %d, want 0 (failed rows go to err, not none)", counts.None)
+	}
+
+	got, err := r.AllFiltered("", "err")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].URL != bad {
+		t.Errorf("AllFiltered(err) = %v, want [%s]", got, bad)
+	}
+}
+
+func TestRecordFailure_TracksCounterAndFirstSeen(t *testing.T) {
+	db := openTestDB(t)
+	r := NewDatabase(db)
+	withGlobalBmDb(t, r)
+	if err := r.MigrateSchema(); err != nil {
+		t.Fatal(err)
+	}
+	url := "https://gone.example/"
+	if _, err := r.CreateOrGet(Bookmark{URL: url, Title: "g"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.RecordFailure(url); err != nil {
+		t.Fatalf("RecordFailure: %v", err)
+	}
+	n, first, err := r.FailureState(url)
+	if err != nil {
+		t.Fatalf("FailureState: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("after 1st failure: counter=%d, want 1", n)
+	}
+	if first.IsZero() {
+		t.Errorf("first_failure_at not set after first failure")
+	}
+	firstStamp := first
+
+	// Second failure increments counter, first_failure_at unchanged.
+	if err := r.RecordFailure(url); err != nil {
+		t.Fatal(err)
+	}
+	n, first, _ = r.FailureState(url)
+	if n != 2 {
+		t.Errorf("after 2nd failure: counter=%d, want 2", n)
+	}
+	if !first.Equal(firstStamp) {
+		t.Errorf("first_failure_at moved: was %v, now %v", firstStamp, first)
+	}
+
+	// Success resets the counter.
+	if err := r.UpsertStatus(url, 200); err != nil {
+		t.Fatal(err)
+	}
+	n, _, _ = r.FailureState(url)
+	if n != 0 {
+		t.Errorf("after success: counter=%d, want 0", n)
+	}
+}
+
+func TestPurgeUnreachable(t *testing.T) {
+	db := openTestDB(t)
+	r := NewDatabase(db)
+	withGlobalBmDb(t, r)
+	if err := r.MigrateSchema(); err != nil {
+		t.Fatal(err)
+	}
+	// Three seed rows:
+	//   keep   — code 0 but has text → keep (manual purge requires empty text)
+	//   purge  — code 0 and empty text → soft-delete
+	//   alive  — code 200 → keep
+	keep := "https://example.com/keep"
+	purge := "https://example.com/purge"
+	alive := "https://example.com/alive"
+	if _, err := r.CreateOrGet(Bookmark{URL: keep, Title: "k", Text: "body"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.CreateOrGet(Bookmark{URL: purge, Title: "p"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.CreateOrGet(Bookmark{URL: alive, Title: "a", Text: "body"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.RecordFailure(keep); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.RecordFailure(purge); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.UpsertStatus(alive, 200); err != nil {
+		t.Fatal(err)
+	}
+
+	n, err := r.PurgeUnreachable()
+	if err != nil {
+		t.Fatalf("PurgeUnreachable: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("purged %d, want 1", n)
+	}
+	if _, err := r.GetByUrl(purge); err == nil {
+		t.Error("purged row still present")
+	}
+	if !r.IsDeleted(purge) {
+		t.Error("purged row not tombstoned")
+	}
+	if _, err := r.GetByUrl(keep); err != nil {
+		t.Errorf("keep row was removed: %v", err)
+	}
+	if _, err := r.GetByUrl(alive); err != nil {
+		t.Errorf("alive row was removed: %v", err)
+	}
+}
+
+func TestAutoSoftDeleteStaleUnreachable(t *testing.T) {
+	db := openTestDB(t)
+	r := NewDatabase(db)
+	withGlobalBmDb(t, r)
+	if err := r.MigrateSchema(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Helper: seed a bookmark and forcibly set its failure state.
+	seed := func(url string, fails int, firstAgo time.Duration, text string) {
+		if _, err := r.CreateOrGet(Bookmark{URL: url, Title: url, Text: text}); err != nil {
+			t.Fatal(err)
+		}
+		first := time.Now().UTC().Add(-firstAgo).Format(time.RFC3339)
+		if _, err := db.Exec(
+			`INSERT INTO bookmark_status (url, status_code, last_checked, consecutive_failures, first_failure_at)
+			 VALUES (?, 0, ?, ?, ?)
+			 ON CONFLICT(url) DO UPDATE SET status_code=0, consecutive_failures=excluded.consecutive_failures, first_failure_at=excluded.first_failure_at`,
+			url, time.Now().UTC().Format(time.RFC3339), fails, first,
+		); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Eligible: 3 strikes, 15 days old, empty text.
+	stale := "https://example.com/stale"
+	seed(stale, 3, 15*24*time.Hour, "")
+
+	// Too recent (only 5 days old).
+	recent := "https://example.com/recent"
+	seed(recent, 5, 5*24*time.Hour, "")
+
+	// Too few strikes (2).
+	flaky := "https://example.com/flaky"
+	seed(flaky, 2, 30*24*time.Hour, "")
+
+	// Has text — preserved by the rule.
+	hasText := "https://example.com/hastext"
+	seed(hasText, 5, 30*24*time.Hour, "body")
+
+	n, err := r.AutoSoftDeleteStaleUnreachable()
+	if err != nil {
+		t.Fatalf("AutoSoftDeleteStaleUnreachable: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("deleted %d, want 1 (only the stale row qualifies)", n)
+	}
+	if _, err := r.GetByUrl(stale); err == nil {
+		t.Error("stale row still present")
+	}
+	for _, u := range []string{recent, flaky, hasText} {
+		if _, err := r.GetByUrl(u); err != nil {
+			t.Errorf("%s was removed: %v", u, err)
+		}
+	}
+}
+
 func TestNotes_UpsertGetDelete(t *testing.T) {
 	db := openTestDB(t)
 	r := NewDatabase(db)
@@ -449,6 +651,19 @@ func TestURLsMissingStatus(t *testing.T) {
 	}
 	if len(got) != 0 {
 		t.Errorf("expected empty after fill, got %v", got)
+	}
+
+	// A previously-unreachable URL (status=0) should be returned for re-probing
+	// so its failure counter can advance.
+	if err := r.RecordFailure(hasStatus); err != nil {
+		t.Fatal(err)
+	}
+	got, err = r.URLsMissingStatus()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0] != hasStatus {
+		t.Errorf("expected code-0 row to be re-probed: got %v", got)
 	}
 }
 

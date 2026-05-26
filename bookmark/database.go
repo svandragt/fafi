@@ -20,7 +20,7 @@ var (
 
 // schemaVersion is the latest schema this binary writes. Bump and add a
 // migration step in MigrateSchema when changing schema shape.
-const schemaVersion = 8
+const schemaVersion = 9
 
 // NoteMaxLen caps note length server-side. ~2KB of plain text is plenty for
 // "why is this bookmarked" reasons without bloating the table.
@@ -96,6 +96,9 @@ func (r *Database) MigrateSchema() error {
 		if err := r.migrateV7toV8(); err != nil {
 			return err
 		}
+		if err := r.migrateV8toV9(); err != nil {
+			return err
+		}
 	case 2:
 		r.version = 2
 		if err := r.migrateV2toV3(); err != nil {
@@ -116,6 +119,9 @@ func (r *Database) MigrateSchema() error {
 		if err := r.migrateV7toV8(); err != nil {
 			return err
 		}
+		if err := r.migrateV8toV9(); err != nil {
+			return err
+		}
 	case 3:
 		r.version = 3
 		if err := r.migrateV3toV4(); err != nil {
@@ -133,6 +139,9 @@ func (r *Database) MigrateSchema() error {
 		if err := r.migrateV7toV8(); err != nil {
 			return err
 		}
+		if err := r.migrateV8toV9(); err != nil {
+			return err
+		}
 	case 4:
 		r.version = 4
 		if err := r.migrateV4toV5(); err != nil {
@@ -147,6 +156,9 @@ func (r *Database) MigrateSchema() error {
 		if err := r.migrateV7toV8(); err != nil {
 			return err
 		}
+		if err := r.migrateV8toV9(); err != nil {
+			return err
+		}
 	case 5:
 		r.version = 5
 		if err := r.migrateV5toV6(); err != nil {
@@ -158,6 +170,9 @@ func (r *Database) MigrateSchema() error {
 		if err := r.migrateV7toV8(); err != nil {
 			return err
 		}
+		if err := r.migrateV8toV9(); err != nil {
+			return err
+		}
 	case 6:
 		r.version = 6
 		if err := r.migrateV6toV7(); err != nil {
@@ -166,9 +181,20 @@ func (r *Database) MigrateSchema() error {
 		if err := r.migrateV7toV8(); err != nil {
 			return err
 		}
+		if err := r.migrateV8toV9(); err != nil {
+			return err
+		}
 	case 7:
 		r.version = 7
 		if err := r.migrateV7toV8(); err != nil {
+			return err
+		}
+		if err := r.migrateV8toV9(); err != nil {
+			return err
+		}
+	case 8:
+		r.version = 8
+		if err := r.migrateV8toV9(); err != nil {
 			return err
 		}
 	case schemaVersion:
@@ -271,10 +297,37 @@ func (r *Database) createStatusTable() error {
 	CREATE TABLE IF NOT EXISTS bookmark_status (
 		url TEXT PRIMARY KEY,
 		status_code INTEGER,
-		last_checked TEXT
+		last_checked TEXT,
+		consecutive_failures INTEGER NOT NULL DEFAULT 0,
+		first_failure_at TEXT
 	);
 	`)
 	return err
+}
+
+// migrateV8toV9 adds failure-tracking columns to bookmark_status so we can
+// distinguish a transient network blip from a long-dead site.
+func (r *Database) migrateV8toV9() error {
+	cols := []string{
+		"ALTER TABLE bookmark_status ADD COLUMN consecutive_failures INTEGER NOT NULL DEFAULT 0",
+		"ALTER TABLE bookmark_status ADD COLUMN first_failure_at TEXT",
+	}
+	for _, stmt := range cols {
+		if _, err := r.db.Exec(stmt); err != nil {
+			// Idempotency: re-running on a partially-migrated DB shouldn't
+			// abort. SQLite reports "duplicate column name" as a generic
+			// error string.
+			if !strings.Contains(err.Error(), "duplicate column name") {
+				return err
+			}
+		}
+	}
+	if err := r.setUserVersion(9); err != nil {
+		return err
+	}
+	r.version = 9
+	log.Println("Database migrated to v9 (status failure tracking)")
+	return nil
 }
 
 // migrateV4toV5 re-normalises every URL through the (possibly updated)
@@ -636,13 +689,15 @@ func (r *Database) All(keywords string) ([]Bookmark, error) {
 }
 
 // StatusCounts holds the number of bookmarks in each HTTP status bucket plus
-// "none" for rows that have never been probed.
+// "none" for rows that have never been probed and "err" for rows where the
+// probe failed at the network layer (DNS, refused, timeout).
 type StatusCounts struct {
 	S2xx int
 	S3xx int
 	S4xx int
 	S5xx int
 	None int
+	Err  int
 }
 
 // AllFiltered behaves like All but restricts results to a status bucket
@@ -664,6 +719,7 @@ func (r *Database) CountStatuses() (StatusCounts, error) {
 	rows, err := r.db.Query(`
 		SELECT
 		  CASE
+		    WHEN status_code = 0 THEN 'err'
 		    WHEN status_code BETWEEN 200 AND 299 THEN '2xx'
 		    WHEN status_code BETWEEN 300 AND 399 THEN '3xx'
 		    WHEN status_code BETWEEN 400 AND 499 THEN '4xx'
@@ -692,6 +748,8 @@ func (r *Database) CountStatuses() (StatusCounts, error) {
 			c.S4xx = n
 		case "5xx":
 			c.S5xx = n
+		case "err":
+			c.Err = n
 		}
 	}
 	if err := r.db.QueryRow(
@@ -714,6 +772,8 @@ func statusFilterClause(bucket string) (clause string, ok bool) {
 		return ` AND url IN (SELECT url FROM bookmark_status WHERE status_code BETWEEN 500 AND 599)`, true
 	case "none":
 		return ` AND url NOT IN (SELECT url FROM bookmark_status)`, true
+	case "err":
+		return ` AND url IN (SELECT url FROM bookmark_status WHERE status_code = 0)`, true
 	}
 	return "", false
 }
@@ -1097,16 +1157,20 @@ func (r *Database) Update(url string, updated Bookmark) (*Bookmark, error) {
 	return &updated, nil
 }
 
-// URLsMissingStatus returns bookmark URLs that have no row in bookmark_status.
-// Used to back-fill statuses without wiping known-good entries. Empty result
-// (and no error) on schemas < v4.
+// URLsMissingStatus returns bookmark URLs that need an HTTP probe — those
+// with no row in bookmark_status, plus those whose last probe never reached a
+// response (status_code=0). The latter are retried so the failure streak can
+// advance toward the auto-soft-delete threshold. Empty result (and no error)
+// on schemas < v4.
 func (r *Database) URLsMissingStatus() ([]string, error) {
 	if r.version < 4 {
 		return nil, nil
 	}
-	rows, err := r.db.Query(
-		`SELECT url FROM bookmarks WHERE url NOT IN (SELECT url FROM bookmark_status)`,
-	)
+	query := `SELECT url FROM bookmarks WHERE url NOT IN (SELECT url FROM bookmark_status)`
+	if r.version >= 9 {
+		query += ` UNION SELECT url FROM bookmark_status WHERE status_code = 0`
+	}
+	rows, err := r.db.Query(query)
 	if err != nil {
 		return nil, err
 	}
@@ -1282,16 +1346,164 @@ func (r *Database) LookupStatus(url string) sql.NullInt64 {
 
 // UpsertStatus records the latest HTTP status code seen for a URL.
 // Stored in the sibling bookmark_status table; safe no-op on schemas < v4.
+// A non-zero status counts as the probe reaching the server, so the failure
+// streak (consecutive_failures, first_failure_at) is cleared. Use
+// RecordFailure for network-layer failures where status is 0.
 func (r *Database) UpsertStatus(url string, statusCode int) error {
 	if r.version < 4 {
 		return nil
 	}
+	if r.version < 9 {
+		_, err := r.db.Exec(
+			`INSERT INTO bookmark_status (url, status_code, last_checked) VALUES (?, ?, ?)
+			 ON CONFLICT(url) DO UPDATE SET status_code = excluded.status_code, last_checked = excluded.last_checked`,
+			url, statusCode, time.Now().UTC().Format(time.RFC3339),
+		)
+		return err
+	}
 	_, err := r.db.Exec(
-		`INSERT INTO bookmark_status (url, status_code, last_checked) VALUES (?, ?, ?)
-		 ON CONFLICT(url) DO UPDATE SET status_code = excluded.status_code, last_checked = excluded.last_checked`,
+		`INSERT INTO bookmark_status (url, status_code, last_checked, consecutive_failures, first_failure_at)
+		 VALUES (?, ?, ?, 0, NULL)
+		 ON CONFLICT(url) DO UPDATE SET
+		   status_code = excluded.status_code,
+		   last_checked = excluded.last_checked,
+		   consecutive_failures = 0,
+		   first_failure_at = NULL`,
 		url, statusCode, time.Now().UTC().Format(time.RFC3339),
 	)
 	return err
+}
+
+// RecordFailure marks a probe attempt that never reached a response (DNS
+// failure, refused connection, timeout). Stores status_code=0, bumps the
+// failure counter, and stamps first_failure_at on the very first attempt.
+// No-op on schemas < v9.
+func (r *Database) RecordFailure(url string) error {
+	if r.version < 9 {
+		return nil
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err := r.db.Exec(
+		`INSERT INTO bookmark_status (url, status_code, last_checked, consecutive_failures, first_failure_at)
+		 VALUES (?, 0, ?, 1, ?)
+		 ON CONFLICT(url) DO UPDATE SET
+		   status_code = 0,
+		   last_checked = excluded.last_checked,
+		   consecutive_failures = bookmark_status.consecutive_failures + 1,
+		   first_failure_at = COALESCE(bookmark_status.first_failure_at, excluded.first_failure_at)`,
+		url, now, now,
+	)
+	return err
+}
+
+// StaleUnreachableDays is the minimum age of first_failure_at for a row to
+// be eligible for automatic soft-delete. Gives flaky sites a fair window
+// to come back before we give up.
+const StaleUnreachableDays = 14
+
+// StaleUnreachableMinStrikes is the minimum failure count needed alongside
+// the age check.
+const StaleUnreachableMinStrikes = 3
+
+// PurgeUnreachable soft-deletes every bookmark whose probe currently fails
+// (status_code=0) and has no scraped text. Triggered manually via
+// FAFI_PURGE_UNREACHABLE=1 — bypasses the time/strike rule used by
+// AutoSoftDeleteStaleUnreachable. Returns the count removed.
+func (r *Database) PurgeUnreachable() (int, error) {
+	if r.version < 9 {
+		return 0, nil
+	}
+	rows, err := r.db.Query(`
+		SELECT b.url FROM bookmarks b
+		JOIN bookmark_status s ON s.url = b.url
+		WHERE s.status_code = 0 AND (b.text IS NULL OR b.text = '')`)
+	if err != nil {
+		return 0, err
+	}
+	var urls []string
+	for rows.Next() {
+		var u string
+		if err := rows.Scan(&u); err != nil {
+			_ = rows.Close()
+			return 0, err
+		}
+		urls = append(urls, u)
+	}
+	if err := rows.Close(); err != nil {
+		return 0, err
+	}
+	for _, u := range urls {
+		if err := r.SoftDelete(u); err != nil {
+			log.Println("PurgeUnreachable SoftDelete error for", u, ":", err)
+		}
+	}
+	return len(urls), nil
+}
+
+// AutoSoftDeleteStaleUnreachable removes bookmarks that have been unreachable
+// for a sustained period: status_code=0, consecutive_failures >= 3, the first
+// failure was more than 14 days ago, and the row has no scraped text. Returns
+// the count removed. Intended to run after each backfill / refresh pass.
+func (r *Database) AutoSoftDeleteStaleUnreachable() (int, error) {
+	if r.version < 9 {
+		return 0, nil
+	}
+	cutoff := time.Now().UTC().Add(-time.Duration(StaleUnreachableDays) * 24 * time.Hour).Format(time.RFC3339)
+	rows, err := r.db.Query(`
+		SELECT b.url FROM bookmarks b
+		JOIN bookmark_status s ON s.url = b.url
+		WHERE s.status_code = 0
+		  AND s.consecutive_failures >= ?
+		  AND s.first_failure_at IS NOT NULL
+		  AND s.first_failure_at <= ?
+		  AND (b.text IS NULL OR b.text = '')`,
+		StaleUnreachableMinStrikes, cutoff,
+	)
+	if err != nil {
+		return 0, err
+	}
+	var urls []string
+	for rows.Next() {
+		var u string
+		if err := rows.Scan(&u); err != nil {
+			_ = rows.Close()
+			return 0, err
+		}
+		urls = append(urls, u)
+	}
+	if err := rows.Close(); err != nil {
+		return 0, err
+	}
+	for _, u := range urls {
+		if err := r.SoftDelete(u); err != nil {
+			log.Println("AutoSoftDelete error for", u, ":", err)
+		}
+	}
+	return len(urls), nil
+}
+
+// FailureState returns the current failure counter and first_failure_at for a
+// URL. Zero / zero-time when no entry exists or schema < v9.
+func (r *Database) FailureState(url string) (int, time.Time, error) {
+	if r.version < 9 {
+		return 0, time.Time{}, nil
+	}
+	var n int
+	var first sql.NullString
+	err := r.db.QueryRow(
+		"SELECT consecutive_failures, first_failure_at FROM bookmark_status WHERE url = ?", url,
+	).Scan(&n, &first)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, time.Time{}, nil
+		}
+		return 0, time.Time{}, err
+	}
+	var t time.Time
+	if first.Valid {
+		t, _ = time.Parse(time.RFC3339, first.String)
+	}
+	return n, t, nil
 }
 
 // UpdateURL renames a bookmark's URL in place. Returns ErrDuplicate if a row

@@ -180,6 +180,19 @@ func main() {
 		if sander.GetArgFromEnvWithDefault("FAFI_BACKFILL_STATUS", "0") == "1" {
 			bookmark.RefreshMissingStatuses(nil)
 			log.Println("Status backfill complete")
+			if n, err := bookmark.BmDb.AutoSoftDeleteStaleUnreachable(); err != nil {
+				log.Println("AutoSoftDelete error:", err)
+			} else if n > 0 {
+				log.Printf("Soft-deleted %d stale unreachable bookmark(s)", n)
+			}
+		}
+		if sander.GetArgFromEnvWithDefault("FAFI_PURGE_UNREACHABLE", "0") == "1" {
+			n, err := bookmark.BmDb.PurgeUnreachable()
+			if err != nil {
+				log.Println("PurgeUnreachable error:", err)
+			} else {
+				log.Printf("Purge unreachable: soft-deleted %d bookmark(s) with no text", n)
+			}
 		}
 		enableIndexing := sander.GetArgFromEnvWithDefault("FAFI_ENABLE_INDEXING", "1")
 		if enableIndexing == "1" {

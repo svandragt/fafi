@@ -69,8 +69,14 @@ FAFI_RESET_INDEX=0
 FAFI_RESET_STATUS=0
 # Set to 1 to probe only bookmarks that have no stored HTTP status, leaving
 # known-good entries alone. Idempotent — safe to leave on but typically set
-# once after a schema upgrade then unset.
+# once after a schema upgrade then unset. Also re-probes rows whose previous
+# probe failed at the network layer (DNS, timeout, refused), and runs the
+# auto-soft-delete pass for stale unreachable bookmarks (>=3 failures, first
+# failure >14 days ago, no scraped text).
 FAFI_BACKFILL_STATUS=0
+# Set to 1 to soft-delete every bookmark whose probe currently fails AND has
+# no scraped text. Manual escape hatch — bypasses the time/strike rule.
+FAFI_PURGE_UNREACHABLE=0
 # Default database path:
 FAFI_DB_FILEPATH=/home/user/fafi.sqlite3
 

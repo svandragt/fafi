@@ -473,6 +473,7 @@
     <a class="chip{{if eq .Status "4xx"}} active{{end}}" href="{{filterURL .Query "4xx"}}"><span class="pill s4">4xx</span><span class="chip-count">{{.StatusCounts.S4xx}}</span></a>
     <a class="chip{{if eq .Status "5xx"}} active{{end}}" href="{{filterURL .Query "5xx"}}"><span class="pill s5">5xx</span><span class="chip-count">{{.StatusCounts.S5xx}}</span></a>
     <a class="chip{{if eq .Status "none"}} active{{end}}" href="{{filterURL .Query "none"}}"><span class="pill s0">none</span><span class="chip-count">{{.StatusCounts.None}}</span></a>
+    <a class="chip{{if eq .Status "err"}} active{{end}}" href="{{filterURL .Query "err"}}" title="Network-level failure (DNS, timeout, refused)"><span class="pill s5">err</span><span class="chip-count">{{.StatusCounts.Err}}</span></a>
 </nav>
 
 {{ if .Query }}
