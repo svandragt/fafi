@@ -64,6 +64,13 @@ FAFI_ENABLE_INDEXING=1
 # (forces a full re-index). Also migrates legacy databases to the latest
 # schema version. Unset after one run.
 FAFI_RESET_INDEX=0
+# Set to 1 to clear every stored HTTP status and re-probe all bookmarks
+# (destructive). Unset after one run.
+FAFI_RESET_STATUS=0
+# Set to 1 to probe only bookmarks that have no stored HTTP status, leaving
+# known-good entries alone. Idempotent — safe to leave on but typically set
+# once after a schema upgrade then unset.
+FAFI_BACKFILL_STATUS=0
 # Default database path:
 FAFI_DB_FILEPATH=/home/user/fafi.sqlite3
 

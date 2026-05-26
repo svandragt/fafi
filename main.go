@@ -129,11 +129,21 @@ func filterURL(query, status string) string {
 	return "/?" + v.Encode()
 }
 
+// truncateRunes returns s truncated to n runes with an ellipsis if cut.
+func truncateRunes(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[:n]) + "…"
+}
+
 var indexTpl = template.Must(template.New("EmbedHtmlIndex").Funcs(template.FuncMap{
-	"contentTypeIcon": contentTypeIcon,
+	"contentTypeIcon":  contentTypeIcon,
 	"highlightSnippet": highlightSnippet,
-	"statusClass":     statusClass,
-	"filterURL":       filterURL,
+	"statusClass":      statusClass,
+	"filterURL":        filterURL,
+	"truncateRunes":    truncateRunes,
 }).Parse(EmbedHtmlIndex))
 
 func main() {
@@ -166,6 +176,10 @@ func main() {
 				bookmark.RefreshAllStatuses(nil)
 				log.Println("Status refresh complete")
 			}
+		}
+		if sander.GetArgFromEnvWithDefault("FAFI_BACKFILL_STATUS", "0") == "1" {
+			bookmark.RefreshMissingStatuses(nil)
+			log.Println("Status backfill complete")
 		}
 		enableIndexing := sander.GetArgFromEnvWithDefault("FAFI_ENABLE_INDEXING", "1")
 		if enableIndexing == "1" {
@@ -225,6 +239,7 @@ func bootServer() {
 	http.HandleFunc("/edit", handleEdit)
 	http.HandleFunc("/delete", handleDelete)
 	http.HandleFunc("/text", handleText)
+	http.HandleFunc("/note", handleNote)
 
 	log.Println("Server starting on http://localhost:" + port)
 	err := http.ListenAndServe(":"+port, nil)
@@ -417,6 +432,32 @@ func handleText(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	if _, err := w.Write([]byte(text)); err != nil {
 		log.Println("text write error:", err)
+	}
+}
+
+func handleNote(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	target := r.FormValue("url")
+	if target == "" {
+		http.Error(w, "missing url", http.StatusBadRequest)
+		return
+	}
+	note := r.FormValue("note")
+	if err := bookmark.BmDb.UpsertNote(target, note); err != nil {
+		log.Println("UpsertNote error:", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	saved, _ := bookmark.BmDb.GetNote(target)
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(struct {
+		URL  string `json:"url"`
+		Note string `json:"note"`
+	}{URL: target, Note: saved}); err != nil {
+		log.Println("note json encode error:", err)
 	}
 }
 

@@ -282,6 +282,43 @@
             cursor: progress;
         }
 
+        /* NOTE */
+        .note {
+            margin: 0.25rem 0 0;
+            font-size: 0.825rem;
+            line-height: 1.5;
+            color: var(--text-muted);
+            max-width: 65ch;
+            cursor: text;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            border-left: 2px solid var(--border-strong);
+            background: transparent;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .note:hover {
+            background: var(--surface-soft);
+        }
+        .note-editor {
+            margin: 0.25rem 0 0;
+            display: block;
+            width: 100%;
+            max-width: 65ch;
+            font: inherit;
+            font-size: 0.825rem;
+            line-height: 1.5;
+            color: var(--text);
+            background: var(--surface);
+            border: 1px solid var(--accent);
+            border-radius: 4px;
+            padding: 0.3rem 0.5rem;
+            resize: vertical;
+            min-height: 2.4rem;
+            outline: none;
+            box-shadow: 0 0 0 3px var(--accent-soft);
+        }
+
         /* PILLS */
         .pill {
             display: inline-flex;
@@ -465,6 +502,9 @@
                     <input type="hidden" name="new_url" value="">
                     <button type="submit" title="Edit URL">Edit</button>
                 </form>
+                {{ if not .Note }}
+                <button type="button" data-add-note title="Add a note (why is this bookmarked?)">Add Note</button>
+                {{ end }}
                 <form method="post" action="/delete" data-delete>
                     <input type="hidden" name="url" value="{{.URL}}">
                     <button type="submit" data-danger title="Soft delete: hide from search and block re-import">Delete</button>
@@ -472,6 +512,11 @@
             </span>
         </div>
         <h3 class="result-title"><a href="{{.URL}}" data-title-link>{{ if .TitleHL }}{{ highlightSnippet .TitleHL 200 }}{{ else }}{{.Title}}{{ end }}</a></h3>
+        <div data-note-slot>
+        {{ if .Note }}
+        <p class="note" data-note data-full="{{.Note}}" title="Click to edit note">{{ truncateRunes .Note 80 }}</p>
+        {{ end }}
+        </div>
         {{ if .Text }}
         <p class="snippet" data-snippet title="Click to read full text">{{ highlightSnippet .Text 320 }}</p>
         {{ end }}
@@ -717,6 +762,102 @@
                 snip.title = 'Click to read full text';
                 alert('Failed to load text: ' + err.message);
             });
+    }
+
+    const NOTE_MAX = 2048;
+
+    document.addEventListener('click', function (e) {
+        const add = e.target.closest('[data-add-note]');
+        if (add) {
+            e.preventDefault();
+            const li = add.closest('li');
+            openNoteEditor(li, '');
+            return;
+        }
+        const note = e.target.closest('[data-note]');
+        if (note) {
+            const li = note.closest('li');
+            openNoteEditor(li, note.dataset.full || note.textContent);
+        }
+    });
+
+    function openNoteEditor(li, initial) {
+        const slot = li.querySelector('[data-note-slot]');
+        if (!slot || slot.querySelector('.note-editor')) return;
+        slot.innerHTML = '';
+        const ta = document.createElement('textarea');
+        ta.className = 'note-editor';
+        ta.maxLength = NOTE_MAX;
+        ta.placeholder = 'Why is this bookmarked? (Enter to save, Esc to cancel)';
+        ta.value = initial;
+        ta.rows = Math.max(2, Math.min(6, (initial.match(/\n/g) || []).length + 2));
+        slot.appendChild(ta);
+        ta.focus();
+        ta.setSelectionRange(ta.value.length, ta.value.length);
+
+        let committed = false;
+        let cancelled = false;
+
+        ta.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                committed = true;
+                ta.blur();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelled = true;
+                ta.blur();
+            }
+        });
+
+        ta.addEventListener('blur', function () {
+            if (cancelled) {
+                renderNote(li, initial);
+                return;
+            }
+            saveNote(li, ta.value, initial);
+        }, { once: true });
+    }
+
+    function saveNote(li, value, previous) {
+        const url = li.dataset.url;
+        const body = new URLSearchParams();
+        body.set('url', url);
+        body.set('note', value);
+        fetch('/note', { method: 'POST', body })
+            .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+            .then(data => renderNote(li, data.note))
+            .catch(err => {
+                alert('Save note failed: ' + err.message);
+                renderNote(li, previous);
+            });
+    }
+
+    function renderNote(li, note) {
+        const slot = li.querySelector('[data-note-slot]');
+        if (!slot) return;
+        slot.innerHTML = '';
+        const actions = li.querySelector('.row-actions');
+        const existingAdd = actions ? actions.querySelector('[data-add-note]') : null;
+        if (note && note.length > 0) {
+            const p = document.createElement('p');
+            p.className = 'note';
+            p.dataset.note = '';
+            p.dataset.full = note;
+            p.title = 'Click to edit note';
+            const max = 80;
+            p.textContent = note.length > max ? note.slice(0, max) + '…' : note;
+            slot.appendChild(p);
+            if (existingAdd) existingAdd.remove();
+        } else if (!existingAdd && actions) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.dataset.addNote = '';
+            btn.title = 'Add a note (why is this bookmarked?)';
+            btn.textContent = 'Add Note';
+            const deleteForm = actions.querySelector('form[data-delete]');
+            actions.insertBefore(btn, deleteForm);
+        }
     }
 
     function editPrompt(form) {

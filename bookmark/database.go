@@ -20,7 +20,11 @@ var (
 
 // schemaVersion is the latest schema this binary writes. Bump and add a
 // migration step in MigrateSchema when changing schema shape.
-const schemaVersion = 7
+const schemaVersion = 8
+
+// NoteMaxLen caps note length server-side. ~2KB of plain text is plenty for
+// "why is this bookmarked" reasons without bloating the table.
+const NoteMaxLen = 2048
 
 type Database struct {
 	db      *sql.DB
@@ -59,6 +63,9 @@ func (r *Database) MigrateSchema() error {
 		if err := r.createDeletedTable(); err != nil {
 			return err
 		}
+		if err := r.createNotesTable(); err != nil {
+			return err
+		}
 		if err := r.setUserVersion(schemaVersion); err != nil {
 			return err
 		}
@@ -86,6 +93,9 @@ func (r *Database) MigrateSchema() error {
 		if err := r.migrateV6toV7(); err != nil {
 			return err
 		}
+		if err := r.migrateV7toV8(); err != nil {
+			return err
+		}
 	case 2:
 		r.version = 2
 		if err := r.migrateV2toV3(); err != nil {
@@ -103,6 +113,9 @@ func (r *Database) MigrateSchema() error {
 		if err := r.migrateV6toV7(); err != nil {
 			return err
 		}
+		if err := r.migrateV7toV8(); err != nil {
+			return err
+		}
 	case 3:
 		r.version = 3
 		if err := r.migrateV3toV4(); err != nil {
@@ -117,12 +130,21 @@ func (r *Database) MigrateSchema() error {
 		if err := r.migrateV6toV7(); err != nil {
 			return err
 		}
+		if err := r.migrateV7toV8(); err != nil {
+			return err
+		}
 	case 4:
 		r.version = 4
 		if err := r.migrateV4toV5(); err != nil {
 			return err
 		}
 		if err := r.migrateV5toV6(); err != nil {
+			return err
+		}
+		if err := r.migrateV6toV7(); err != nil {
+			return err
+		}
+		if err := r.migrateV7toV8(); err != nil {
 			return err
 		}
 	case 5:
@@ -133,9 +155,20 @@ func (r *Database) MigrateSchema() error {
 		if err := r.migrateV6toV7(); err != nil {
 			return err
 		}
+		if err := r.migrateV7toV8(); err != nil {
+			return err
+		}
 	case 6:
 		r.version = 6
 		if err := r.migrateV6toV7(); err != nil {
+			return err
+		}
+		if err := r.migrateV7toV8(); err != nil {
+			return err
+		}
+	case 7:
+		r.version = 7
+		if err := r.migrateV7toV8(); err != nil {
 			return err
 		}
 	case schemaVersion:
@@ -190,6 +223,32 @@ func (r *Database) createDeletedTable() error {
 	);
 	`)
 	return err
+}
+
+// createNotesTable creates the sibling table holding a user-supplied note per
+// bookmark. Notes are not full-text indexed — they're metadata.
+func (r *Database) createNotesTable() error {
+	_, err := r.db.Exec(`
+	CREATE TABLE IF NOT EXISTS bookmark_notes (
+		url TEXT PRIMARY KEY,
+		note TEXT NOT NULL,
+		updated_at TEXT
+	);
+	`)
+	return err
+}
+
+// migrateV7toV8 adds the bookmark_notes sibling table.
+func (r *Database) migrateV7toV8() error {
+	if err := r.createNotesTable(); err != nil {
+		return err
+	}
+	if err := r.setUserVersion(8); err != nil {
+		return err
+	}
+	r.version = 8
+	log.Println("Database migrated to v8 (notes)")
+	return nil
 }
 
 // migrateV5toV6 adds the bookmark_deleted tombstone table.
@@ -258,6 +317,9 @@ func (r *Database) migrateV4toV5() error {
 			if _, err := r.db.Exec("UPDATE bookmark_status SET url = ? WHERE url = ?", t.newURL, t.oldURL); err != nil {
 				return err
 			}
+			// bookmark_notes may not exist yet at this point in the migration
+			// chain; ignore missing-table errors.
+			_, _ = r.db.Exec("UPDATE bookmark_notes SET url = ? WHERE url = ?", t.newURL, t.oldURL)
 			renamed++
 			continue
 		}
@@ -717,9 +779,17 @@ func sanitizeFTSQuery(q string) string {
 func (r *Database) allV2Filtered(keywords, statusFilter string) ([]Bookmark, error) {
 	var rows *sql.Rows
 	var err error
-	filterClause, _ := statusFilterClause(statusFilter)
+	filterClause, hasStatus := statusFilterClause(statusFilter)
 	if keywords != "" {
 		keywords = sanitizeFTSQuery(keywords)
+	}
+	// Normally we hide rows without scraped text (still queued / probe
+	// failed), but when the user picks a status filter their intent is
+	// "show me everything in this bucket" — text-less 5xx / 4xx rows are
+	// often the most interesting in that view.
+	textClause := "AND text is not '' "
+	if hasStatus {
+		textClause = ""
 	}
 	if keywords != "" {
 		//goland:noinspection SqlSignature,SqlResolve
@@ -734,16 +804,16 @@ func (r *Database) allV2Filtered(keywords, statusFilter string) ([]Bookmark, err
 				highlight(bookmarks, 1, ?, ?) as title_hl,
 				highlight(bookmarks, 0, ?, ?) as url_hl
 			FROM bookmarks
-			WHERE text is not '' AND bookmarks MATCH ?`+filterClause+`
+			WHERE bookmarks MATCH ? `+textClause+filterClause+`
 			ORDER BY bm25(bookmarks, 1.5, 3.0, 1.0, 1.0, 1.0, 1.0)
 			LIMIT ?`,
 			"\x02", "\x03", "\x02", "\x03", "\x02", "\x03", keywords, 50,
 		)
 	} else {
+		where := "WHERE 1=1 " + textClause + filterClause
 		rows, err = r.db.Query(
 			`SELECT url, title, text, content_type, isScraped, dateAdded
-			 FROM bookmarks
-			 WHERE text is not ''` + filterClause + `
+			 FROM bookmarks ` + where + `
 			 ORDER BY dateAdded DESC, title
 			 LIMIT 50`,
 		)
@@ -780,6 +850,9 @@ func (r *Database) allV2Filtered(keywords, statusFilter string) ([]Bookmark, err
 	}
 	if err := r.attachStatuses(all); err != nil {
 		log.Println("attachStatuses error:", err)
+	}
+	if err := r.attachNotes(all); err != nil {
+		log.Println("attachNotes error:", err)
 	}
 	log.Println(len(all), sander.Pluralize("result", len(all)))
 	return all, nil
@@ -1024,6 +1097,31 @@ func (r *Database) Update(url string, updated Bookmark) (*Bookmark, error) {
 	return &updated, nil
 }
 
+// URLsMissingStatus returns bookmark URLs that have no row in bookmark_status.
+// Used to back-fill statuses without wiping known-good entries. Empty result
+// (and no error) on schemas < v4.
+func (r *Database) URLsMissingStatus() ([]string, error) {
+	if r.version < 4 {
+		return nil, nil
+	}
+	rows, err := r.db.Query(
+		`SELECT url FROM bookmarks WHERE url NOT IN (SELECT url FROM bookmark_status)`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []string
+	for rows.Next() {
+		var u string
+		if err := rows.Scan(&u); err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, nil
+}
+
 // AllURLs returns every bookmark URL. Used by background maintenance jobs
 // (e.g. status refresh).
 func (r *Database) AllURLs() ([]string, error) {
@@ -1095,6 +1193,82 @@ func (r *Database) SoftDelete(url string) error {
 	return err
 }
 
+// GetNote returns the stored note for a URL, or "" if none / schema < v8.
+func (r *Database) GetNote(url string) (string, error) {
+	if r.version < 8 {
+		return "", nil
+	}
+	var n string
+	err := r.db.QueryRow("SELECT note FROM bookmark_notes WHERE url = ?", url).Scan(&n)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil
+		}
+		return "", err
+	}
+	return n, nil
+}
+
+// UpsertNote stores a note for the URL. An empty note deletes the row.
+// Trims whitespace and enforces NoteMaxLen.
+func (r *Database) UpsertNote(url, note string) error {
+	if r.version < 8 {
+		return errors.New("schema does not support notes")
+	}
+	note = strings.TrimSpace(note)
+	if len([]rune(note)) > NoteMaxLen {
+		runes := []rune(note)
+		note = string(runes[:NoteMaxLen])
+	}
+	if note == "" {
+		_, err := r.db.Exec("DELETE FROM bookmark_notes WHERE url = ?", url)
+		return err
+	}
+	_, err := r.db.Exec(
+		`INSERT INTO bookmark_notes (url, note, updated_at) VALUES (?, ?, ?)
+		 ON CONFLICT(url) DO UPDATE SET note = excluded.note, updated_at = excluded.updated_at`,
+		url, note, time.Now().UTC().Format(time.RFC3339),
+	)
+	return err
+}
+
+// attachNotes fills Note on each bookmark from the sibling table.
+// No-op on schemas < v8.
+func (r *Database) attachNotes(bms []Bookmark) error {
+	if r.version < 8 || len(bms) == 0 {
+		return nil
+	}
+	placeholders := make([]string, len(bms))
+	args := make([]any, len(bms))
+	for i, bm := range bms {
+		placeholders[i] = "?"
+		args[i] = bm.URL
+	}
+	rows, err := r.db.Query(
+		"SELECT url, note FROM bookmark_notes WHERE url IN ("+strings.Join(placeholders, ",")+")",
+		args...,
+	)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+
+	byURL := make(map[string]string, len(bms))
+	for rows.Next() {
+		var u, n string
+		if err := rows.Scan(&u, &n); err != nil {
+			return err
+		}
+		byURL[u] = n
+	}
+	for i := range bms {
+		if n, ok := byURL[bms[i].URL]; ok {
+			bms[i].Note = n
+		}
+	}
+	return nil
+}
+
 // LookupStatus returns the persisted HTTP status for a URL, or an invalid
 // NullInt64 if none is stored (or schema < v4).
 func (r *Database) LookupStatus(url string) sql.NullInt64 {
@@ -1146,6 +1320,9 @@ func (r *Database) UpdateURL(oldURL, newURL string) error {
 	if r.version >= 4 {
 		_, _ = r.db.Exec("UPDATE bookmark_status SET url = ? WHERE url = ?", newURL, oldURL)
 	}
+	if r.version >= 8 {
+		_, _ = r.db.Exec("UPDATE bookmark_notes SET url = ? WHERE url = ?", newURL, oldURL)
+	}
 	return nil
 }
 
@@ -1169,6 +1346,9 @@ func (r *Database) Delete(url string) error {
 	}
 	if r.version >= 4 {
 		_, _ = r.db.Exec("DELETE FROM bookmark_status WHERE url = ?", url)
+	}
+	if r.version >= 8 {
+		_, _ = r.db.Exec("DELETE FROM bookmark_notes WHERE url = ?", url)
 	}
 
 	return err

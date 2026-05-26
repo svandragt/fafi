@@ -183,6 +183,41 @@ func RefreshAllStatuses(progressInc func()) {
 	}
 }
 
+// RefreshMissingStatuses probes only URLs that have no entry in bookmark_status
+// and upserts the result. Cheap, idempotent: re-runs are no-ops once every row
+// has a status. Used to back-fill rows indexed before status tracking landed.
+func RefreshMissingStatuses(progressInc func()) {
+	urls, err := BmDb.URLsMissingStatus()
+	if err != nil {
+		log.Println("RefreshMissingStatuses: list error:", err)
+		return
+	}
+	if len(urls) == 0 {
+		return
+	}
+	log.Printf("Backfilling HTTP status for %d bookmarks", len(urls))
+	const workers = 8
+	sem := make(chan struct{}, workers)
+	for _, u := range urls {
+		sem <- struct{}{}
+		go func(u string) {
+			defer func() { <-sem }()
+			_, status, _ := ProbeContentType(u)
+			if status != 0 {
+				if err := BmDb.UpsertStatus(u, status); err != nil {
+					log.Println("RefreshMissingStatuses upsert error:", err)
+				}
+			}
+			if progressInc != nil {
+				progressInc()
+			}
+		}(u)
+	}
+	for i := 0; i < workers; i++ {
+		sem <- struct{}{}
+	}
+}
+
 func CreateSampleBookmarks(r *Database) {
 	skipRecords := sander.GetArgFromEnvWithDefault("FAFI_SKIP_RECORDS", "0")
 	if skipRecords == "0" {

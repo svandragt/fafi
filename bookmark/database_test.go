@@ -226,8 +226,8 @@ func TestMigrateV2toV3_DedupSweep(t *testing.T) {
 	if err := r.MigrateSchema(); err != nil {
 		t.Fatalf("MigrateSchema: %v", err)
 	}
-	if r.Version() != 7 {
-		t.Fatalf("version = %d, want 7", r.Version())
+	if r.Version() != schemaVersion {
+		t.Fatalf("version = %d, want %d", r.Version(), schemaVersion)
 	}
 
 	// http duplicate should be gone, https should have inherited the body.
@@ -248,6 +248,207 @@ func TestMigrateV2toV3_DedupSweep(t *testing.T) {
 	// Lone http without an https counterpart is untouched.
 	if _, err := r.GetByUrl("http://only-http.test/"); err != nil {
 		t.Errorf("lone http row was deleted: %v", err)
+	}
+}
+
+func TestNotes_UpsertGetDelete(t *testing.T) {
+	db := openTestDB(t)
+	r := NewDatabase(db)
+	withGlobalBmDb(t, r)
+	if err := r.MigrateSchema(); err != nil {
+		t.Fatal(err)
+	}
+	url := "https://example.com/n"
+	if _, err := r.CreateOrGet(Bookmark{URL: url, Title: "N"}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Initially empty.
+	got, err := r.GetNote(url)
+	if err != nil || got != "" {
+		t.Fatalf("expected empty note, got %q err=%v", got, err)
+	}
+
+	// Upsert.
+	if err := r.UpsertNote(url, "  why bookmarked  "); err != nil {
+		t.Fatalf("UpsertNote: %v", err)
+	}
+	got, _ = r.GetNote(url)
+	if got != "why bookmarked" {
+		t.Errorf("note = %q, want trimmed", got)
+	}
+
+	// Empty deletes.
+	if err := r.UpsertNote(url, ""); err != nil {
+		t.Fatalf("UpsertNote empty: %v", err)
+	}
+	got, _ = r.GetNote(url)
+	if got != "" {
+		t.Errorf("note after empty upsert = %q, want empty", got)
+	}
+
+	// Cascade on Delete.
+	if err := r.UpsertNote(url, "x"); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Delete(url); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = r.GetNote(url)
+	if got != "" {
+		t.Errorf("note survived bookmark delete: %q", got)
+	}
+}
+
+// When a status filter is active, rows without scraped text should still be
+// returned — a 5xx bookmark typically has no text precisely because the page
+// failed to load, but the user wants to see it when filtering by 5xx.
+func TestAllFiltered_StatusFilterIncludesEmptyText(t *testing.T) {
+	db := openTestDB(t)
+	r := NewDatabase(db)
+	withGlobalBmDb(t, r)
+	if err := r.MigrateSchema(); err != nil {
+		t.Fatal(err)
+	}
+
+	withText := "https://example.com/ok"
+	noText := "https://example.com/broken"
+	if _, err := r.CreateOrGet(Bookmark{URL: withText, Title: "ok", Text: "body"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.CreateOrGet(Bookmark{URL: noText, Title: "broken"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, u := range []string{withText, noText} {
+		if err := r.UpsertStatus(u, 503); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	got, err := r.AllFiltered("", "5xx")
+	if err != nil {
+		t.Fatalf("AllFiltered: %v", err)
+	}
+	if len(got) != 2 {
+		urls := make([]string, 0, len(got))
+		for _, b := range got {
+			urls = append(urls, b.URL)
+		}
+		t.Errorf("got %d rows %v, want 2 (text-less 5xx row must be included)", len(got), urls)
+	}
+}
+
+// For every status bucket, CountStatuses (used by the chip badge) and
+// AllFiltered (the result list) should agree — clicking a chip must show
+// exactly that many rows.
+func TestCountsMatchFilteredResults_AllBuckets(t *testing.T) {
+	db := openTestDB(t)
+	r := NewDatabase(db)
+	withGlobalBmDb(t, r)
+	if err := r.MigrateSchema(); err != nil {
+		t.Fatal(err)
+	}
+
+	// One row with text, one without, for each of 2xx/3xx/4xx/5xx.
+	// Plus two "none"-bucket rows (no bookmark_status entry), again
+	// one with text, one without.
+	cases := []struct {
+		bucket string
+		code   int
+	}{{"2xx", 200}, {"3xx", 301}, {"4xx", 404}, {"5xx", 503}}
+	for _, c := range cases {
+		withText := "https://example.com/" + c.bucket + "/ok"
+		noText := "https://example.com/" + c.bucket + "/notext"
+		if _, err := r.CreateOrGet(Bookmark{URL: withText, Title: c.bucket + " ok", Text: "body"}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := r.CreateOrGet(Bookmark{URL: noText, Title: c.bucket + " notext"}); err != nil {
+			t.Fatal(err)
+		}
+		if err := r.UpsertStatus(withText, c.code); err != nil {
+			t.Fatal(err)
+		}
+		if err := r.UpsertStatus(noText, c.code); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := r.CreateOrGet(Bookmark{URL: "https://example.com/none/ok", Title: "none ok", Text: "body"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.CreateOrGet(Bookmark{URL: "https://example.com/none/notext", Title: "none notext"}); err != nil {
+		t.Fatal(err)
+	}
+
+	counts, err := r.CountStatuses()
+	if err != nil {
+		t.Fatalf("CountStatuses: %v", err)
+	}
+
+	checks := []struct {
+		bucket string
+		want   int
+	}{
+		{"2xx", counts.S2xx},
+		{"3xx", counts.S3xx},
+		{"4xx", counts.S4xx},
+		{"5xx", counts.S5xx},
+		{"none", counts.None},
+	}
+	for _, c := range checks {
+		got, err := r.AllFiltered("", c.bucket)
+		if err != nil {
+			t.Fatalf("AllFiltered %s: %v", c.bucket, err)
+		}
+		if len(got) != c.want {
+			urls := make([]string, 0, len(got))
+			for _, b := range got {
+				urls = append(urls, b.URL)
+			}
+			t.Errorf("bucket %s: chip count=%d, results=%d (%v)", c.bucket, c.want, len(got), urls)
+		}
+		if c.want != 2 {
+			t.Errorf("bucket %s seed sanity: want chip count 2, got %d", c.bucket, c.want)
+		}
+	}
+}
+
+func TestURLsMissingStatus(t *testing.T) {
+	db := openTestDB(t)
+	r := NewDatabase(db)
+	withGlobalBmDb(t, r)
+	if err := r.MigrateSchema(); err != nil {
+		t.Fatal(err)
+	}
+
+	hasStatus := "https://example.com/known"
+	noStatus := "https://example.com/unknown"
+	for _, u := range []string{hasStatus, noStatus} {
+		if _, err := r.CreateOrGet(Bookmark{URL: u, Title: "T"}); err != nil {
+			t.Fatalf("seed %s: %v", u, err)
+		}
+	}
+	if err := r.UpsertStatus(hasStatus, 200); err != nil {
+		t.Fatalf("UpsertStatus: %v", err)
+	}
+
+	got, err := r.URLsMissingStatus()
+	if err != nil {
+		t.Fatalf("URLsMissingStatus: %v", err)
+	}
+	if len(got) != 1 || got[0] != noStatus {
+		t.Errorf("got %v, want exactly [%s]", got, noStatus)
+	}
+
+	// After filling it, the list should be empty.
+	if err := r.UpsertStatus(noStatus, 404); err != nil {
+		t.Fatal(err)
+	}
+	got, err = r.URLsMissingStatus()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected empty after fill, got %v", got)
 	}
 }
 
