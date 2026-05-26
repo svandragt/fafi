@@ -1,0 +1,8 @@
+################################################################
+# abuse.ch URLhaus Database Dump (CSV - online URLs only)      #
+################################################################
+#
+# id,dateadded,url,url_status,last_online,threat,tags,urlhaus_link,reporter
+"1","2026-05-26 12:45:09","https://evil.example/a.exe","online","2026-05-26 12:45:09","malware_download","exe","https://urlhaus.abuse.ch/url/1/","reporter1"
+"2","2026-05-26 12:38:26","http://bad.example:8080/payload","online","2026-05-26 12:38:26","malware_download","elf","https://urlhaus.abuse.ch/url/2/","reporter2"
+"3","2026-05-26 12:30:00","https://taken-down.example/x","offline","2026-05-25 00:00:00","malware_download","exe","https://urlhaus.abuse.ch/url/3/","reporter3"

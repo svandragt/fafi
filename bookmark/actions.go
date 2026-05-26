@@ -10,6 +10,17 @@ import (
 	"strings"
 )
 
+// SafetyChecker classifies a URL against a blocklist. main wires the
+// safety.Loader in when FAFI_BLOCKLIST_ENABLED is on; left nil otherwise so
+// the indexer skips the check entirely.
+type SafetyChecker interface {
+	Check(url string) (verdict string, blocked bool)
+}
+
+// Checker is the package-level safety hook. Read by index() before each
+// fetch; nil means "no blocklist configured".
+var Checker SafetyChecker
+
 func Index(bm Bookmark) {
 	index(bm, false)
 }
@@ -32,6 +43,23 @@ func index(bm Bookmark, overwrite bool) {
 	}()
 
 	log.Println("Indexing:", sourceUrl)
+
+	if Checker != nil {
+		if source, blocked := Checker.Check(sourceUrl); blocked {
+			log.Printf("Safety: blocked %s (%s)", sourceUrl, source)
+			if err := bmDb.UpsertSafety(sourceUrl, "blocked", source); err != nil {
+				log.Println("UpsertSafety error:", err)
+			}
+			// Mark as scraped so we don't requeue forever, but don't pull
+			// the body in. Title and text stay as whatever the user
+			// imported, so they can still identify the row.
+			bm.IsScraped = sql.NullBool{Bool: true, Valid: true}
+			if _, err := bmDb.Update(sourceUrl, bm); err != nil {
+				log.Println("Update error:", err)
+			}
+			return
+		}
+	}
 
 	ct, status, err := ProbeContentType(sourceUrl)
 	if status != 0 {

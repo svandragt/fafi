@@ -342,6 +342,11 @@
             border: 1px dashed var(--border-strong);
             padding: 0 0.4rem;
         }
+        .pill.state-blocked {
+            background: oklch(0.92 0.08 28);
+            color: oklch(0.35 0.18 28);
+            font-weight: 600;
+        }
         /* "indexed" is the default; no pill rendered for it. */
 
         /* ROW ACTIONS */
@@ -492,7 +497,7 @@
         <div class="meta-line">
             {{$icon := contentTypeIcon .ContentType}}{{if $icon}}<span class="ct-icon" data-ct-icon title="{{.ContentType}}">{{$icon}}</span>{{end}}
             <span class="url" data-url-text>{{ if .URLHL }}{{ highlightSnippet .URLHL 200 }}{{ else }}{{.URL}}{{ end }}</span>
-            <span class="pills" data-pills>{{ if .StatusCode.Valid }}<span class="pill {{statusClass .StatusCode.Int64}}" title="HTTP status">{{.StatusCode.Int64}}</span>{{ end }}{{ if and .IsScraped.Valid (not .IsScraped.Bool) }}<span class="pill state-pending">pending</span>{{ end }}{{ if not .IsScraped.Valid }}<span class="pill state-pending">pending</span>{{ end }}</span>
+            <span class="pills" data-pills>{{ if .Safety }}<span class="pill state-blocked" title="Reported malicious by {{.Safety}}. Open with caution.">⚠ unsafe</span>{{ end }}{{ if .StatusCode.Valid }}<span class="pill {{statusClass .StatusCode.Int64}}" title="HTTP status">{{.StatusCode.Int64}}</span>{{ end }}{{ if and .IsScraped.Valid (not .IsScraped.Bool) }}<span class="pill state-pending">pending</span>{{ end }}{{ if not .IsScraped.Valid }}<span class="pill state-pending">pending</span>{{ end }}</span>
             <span class="row-actions">
                 <form method="post" action="/reindex" data-reindex>
                     <input type="hidden" name="url" value="{{.URL}}">

@@ -83,6 +83,13 @@ FAFI_DB_FILEPATH=/home/user/fafi.sqlite3
 # Enable importing bookmarks from Firefox profile db:
 FAFI_FIREFOX=/home/san.../32kuswpy.default-release/places.sqlite
 
+# Privacy-preserving malware blocklist. On by default. Downloads the
+# URLhaus "online URLs" feed to FAFI_BLOCKLIST_DIR on the configured
+# interval; all per-bookmark checks happen locally against the snapshot.
+# Set FAFI_BLOCKLIST_ENABLED=0 to disable the feature entirely.
+FAFI_BLOCKLIST_ENABLED=1
+FAFI_BLOCKLIST_DIR=blocklists
+FAFI_BLOCKLIST_REFRESH=6h
 ```
 
 ## Command-line arguments

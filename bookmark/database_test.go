@@ -61,6 +61,56 @@ func TestMigrateSchema_FreshDBCreatesLatest(t *testing.T) {
 	}
 }
 
+func TestUpsertSafety_RoundTrip(t *testing.T) {
+	db := openTestDB(t)
+	r := NewDatabase(db)
+	withGlobalBmDb(t, r)
+
+	if err := r.MigrateSchema(); err != nil {
+		t.Fatalf("MigrateSchema: %v", err)
+	}
+
+	url := "https://malware.example/x"
+	if _, err := r.CreateOrGet(Bookmark{URL: url, Title: "t", Text: "some text"}); err != nil {
+		t.Fatalf("CreateOrGet: %v", err)
+	}
+	if err := r.UpsertSafety(url, "blocked", "urlhaus"); err != nil {
+		t.Fatalf("UpsertSafety: %v", err)
+	}
+
+	all, err := r.AllFiltered("", "")
+	if err != nil {
+		t.Fatalf("AllFiltered: %v", err)
+	}
+	var found *Bookmark
+	for i := range all {
+		if all[i].URL == url {
+			found = &all[i]
+			break
+		}
+	}
+	if found == nil {
+		t.Fatalf("bookmark %s missing from results", url)
+	}
+	if found.Safety != "blocked:urlhaus" {
+		t.Errorf("Safety = %q, want blocked:urlhaus", found.Safety)
+	}
+
+	// Clearing the verdict removes the row.
+	if err := r.UpsertSafety(url, "", ""); err != nil {
+		t.Fatalf("UpsertSafety clear: %v", err)
+	}
+	all, err = r.AllFiltered("", "")
+	if err != nil {
+		t.Fatalf("AllFiltered after clear: %v", err)
+	}
+	for _, bm := range all {
+		if bm.URL == url && bm.Safety != "" {
+			t.Errorf("Safety = %q after clear, want empty", bm.Safety)
+		}
+	}
+}
+
 // seedV1 manually constructs the legacy v1 schema (FTS5 without content_type
 // + sibling meta table), leaving user_version=0 to mimic pre-versioning installs.
 func seedV1(t *testing.T, db *sql.DB) {

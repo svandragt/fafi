@@ -20,7 +20,7 @@ var (
 
 // schemaVersion is the latest schema this binary writes. Bump and add a
 // migration step in MigrateSchema when changing schema shape.
-const schemaVersion = 9
+const schemaVersion = 10
 
 // NoteMaxLen caps note length server-side. ~2KB of plain text is plenty for
 // "why is this bookmarked" reasons without bloating the table.
@@ -66,6 +66,9 @@ func (r *Database) MigrateSchema() error {
 		if err := r.createNotesTable(); err != nil {
 			return err
 		}
+		if err := r.createSafetyTable(); err != nil {
+			return err
+		}
 		if err := r.setUserVersion(schemaVersion); err != nil {
 			return err
 		}
@@ -99,6 +102,9 @@ func (r *Database) MigrateSchema() error {
 		if err := r.migrateV8toV9(); err != nil {
 			return err
 		}
+		if err := r.migrateV9toV10(); err != nil {
+			return err
+		}
 	case 2:
 		r.version = 2
 		if err := r.migrateV2toV3(); err != nil {
@@ -122,6 +128,9 @@ func (r *Database) MigrateSchema() error {
 		if err := r.migrateV8toV9(); err != nil {
 			return err
 		}
+		if err := r.migrateV9toV10(); err != nil {
+			return err
+		}
 	case 3:
 		r.version = 3
 		if err := r.migrateV3toV4(); err != nil {
@@ -142,6 +151,9 @@ func (r *Database) MigrateSchema() error {
 		if err := r.migrateV8toV9(); err != nil {
 			return err
 		}
+		if err := r.migrateV9toV10(); err != nil {
+			return err
+		}
 	case 4:
 		r.version = 4
 		if err := r.migrateV4toV5(); err != nil {
@@ -159,6 +171,9 @@ func (r *Database) MigrateSchema() error {
 		if err := r.migrateV8toV9(); err != nil {
 			return err
 		}
+		if err := r.migrateV9toV10(); err != nil {
+			return err
+		}
 	case 5:
 		r.version = 5
 		if err := r.migrateV5toV6(); err != nil {
@@ -173,6 +188,9 @@ func (r *Database) MigrateSchema() error {
 		if err := r.migrateV8toV9(); err != nil {
 			return err
 		}
+		if err := r.migrateV9toV10(); err != nil {
+			return err
+		}
 	case 6:
 		r.version = 6
 		if err := r.migrateV6toV7(); err != nil {
@@ -184,6 +202,9 @@ func (r *Database) MigrateSchema() error {
 		if err := r.migrateV8toV9(); err != nil {
 			return err
 		}
+		if err := r.migrateV9toV10(); err != nil {
+			return err
+		}
 	case 7:
 		r.version = 7
 		if err := r.migrateV7toV8(); err != nil {
@@ -192,9 +213,20 @@ func (r *Database) MigrateSchema() error {
 		if err := r.migrateV8toV9(); err != nil {
 			return err
 		}
+		if err := r.migrateV9toV10(); err != nil {
+			return err
+		}
 	case 8:
 		r.version = 8
 		if err := r.migrateV8toV9(); err != nil {
+			return err
+		}
+		if err := r.migrateV9toV10(); err != nil {
+			return err
+		}
+	case 9:
+		r.version = 9
+		if err := r.migrateV9toV10(); err != nil {
 			return err
 		}
 	case schemaVersion:
@@ -262,6 +294,35 @@ func (r *Database) createNotesTable() error {
 	);
 	`)
 	return err
+}
+
+// createSafetyTable creates the sibling table that records a malware/phishing
+// verdict per URL. Kept outside the FTS5 table so we don't have to rebuild
+// the index when the safety feature is added.
+func (r *Database) createSafetyTable() error {
+	_, err := r.db.Exec(`
+	CREATE TABLE IF NOT EXISTS bookmark_safety (
+		url TEXT PRIMARY KEY,
+		verdict TEXT NOT NULL,
+		source TEXT,
+		checked_at TEXT
+	);
+	`)
+	return err
+}
+
+// migrateV9toV10 adds the bookmark_safety sibling table. No data backfill —
+// rows get a verdict the next time the indexer touches them.
+func (r *Database) migrateV9toV10() error {
+	if err := r.createSafetyTable(); err != nil {
+		return err
+	}
+	if err := r.setUserVersion(10); err != nil {
+		return err
+	}
+	r.version = 10
+	log.Println("Database migrated to v10 (safety verdicts)")
+	return nil
 }
 
 // migrateV7toV8 adds the bookmark_notes sibling table.
@@ -914,8 +975,79 @@ func (r *Database) allV2Filtered(keywords, statusFilter string) ([]Bookmark, err
 	if err := r.attachNotes(all); err != nil {
 		log.Println("attachNotes error:", err)
 	}
+	if err := r.attachSafety(all); err != nil {
+		log.Println("attachSafety error:", err)
+	}
 	log.Println(len(all), sander.Pluralize("result", len(all)))
 	return all, nil
+}
+
+// attachSafety fills Safety on each bookmark from the sibling table.
+// No-op on schemas without the table.
+func (r *Database) attachSafety(bms []Bookmark) error {
+	if r.version < 10 || len(bms) == 0 {
+		return nil
+	}
+	placeholders := make([]string, len(bms))
+	args := make([]any, len(bms))
+	for i, bm := range bms {
+		placeholders[i] = "?"
+		args[i] = bm.URL
+	}
+	rows, err := r.db.Query(
+		"SELECT url, verdict, source FROM bookmark_safety WHERE url IN ("+strings.Join(placeholders, ",")+")",
+		args...,
+	)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+
+	type entry struct{ verdict, source string }
+	byURL := make(map[string]entry, len(bms))
+	for rows.Next() {
+		var u, v string
+		var src sql.NullString
+		if err := rows.Scan(&u, &v, &src); err != nil {
+			return err
+		}
+		byURL[u] = entry{verdict: v, source: src.String}
+	}
+	for i := range bms {
+		if e, ok := byURL[bms[i].URL]; ok {
+			// Render as "verdict:source" so the UI can show both, e.g.
+			// "blocked:urlhaus". When source is empty, fall back to just
+			// the verdict.
+			if e.source != "" {
+				bms[i].Safety = e.verdict + ":" + e.source
+			} else {
+				bms[i].Safety = e.verdict
+			}
+		}
+	}
+	return nil
+}
+
+// UpsertSafety records a safety verdict for url. verdict is typically
+// "blocked"; source identifies the feed ("urlhaus"). Passing an empty
+// verdict deletes the row, restoring the URL to "unchecked".
+func (r *Database) UpsertSafety(url, verdict, source string) error {
+	if r.version < 10 {
+		return nil
+	}
+	if verdict == "" {
+		_, err := r.db.Exec("DELETE FROM bookmark_safety WHERE url = ?", url)
+		return err
+	}
+	_, err := r.db.Exec(`
+		INSERT INTO bookmark_safety (url, verdict, source, checked_at)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(url) DO UPDATE SET
+			verdict = excluded.verdict,
+			source = excluded.source,
+			checked_at = excluded.checked_at
+	`, url, verdict, source, time.Now().Format(time.RFC3339))
+	return err
 }
 
 // attachStatuses fills StatusCode on each bookmark from the sibling table.

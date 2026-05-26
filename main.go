@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	_ "embed"
 	"encoding/json"
 	"fafi2/bookmark"
 	"fafi2/integration"
 	"fafi2/progress"
+	"fafi2/safety"
 	"fafi2/sander"
 	"fmt"
 	"github.com/joho/godotenv"
@@ -157,6 +159,8 @@ func main() {
 	// Check if --firefox argument was present
 	firefoxProfilePath := sander.GetArgFromEnvWithDefault("FAFI_FIREFOX", "")
 
+	bootSafety()
+
 	go func() {
 		if firefoxProfilePath != "" {
 			integration.ImportFirefoxProfile(firefoxProfilePath)
@@ -286,6 +290,29 @@ func bootDatabase() *sql.DB {
 	bookmark.CreateSampleBookmarks(bookmark.BmDb)
 
 	return db
+}
+
+// bootSafety wires the URLhaus blocklist. On by default; disable with
+// FAFI_BLOCKLIST_ENABLED=0. The on-disk snapshot is reused across restarts so
+// the very first request after boot still gets a match.
+func bootSafety() {
+	if sander.GetArgFromEnvWithDefault("FAFI_BLOCKLIST_ENABLED", "1") != "1" {
+		log.Println("Safety: blocklist disabled")
+		return
+	}
+	dir := sander.GetArgFromEnvWithDefault("FAFI_BLOCKLIST_DIR", "blocklists")
+	refreshStr := sander.GetArgFromEnvWithDefault("FAFI_BLOCKLIST_REFRESH", "6h")
+	refresh, err := time.ParseDuration(refreshStr)
+	if err != nil {
+		log.Printf("Safety: invalid FAFI_BLOCKLIST_REFRESH %q, using 6h: %v", refreshStr, err)
+		refresh = 6 * time.Hour
+	}
+	loader := safety.NewLoader("", dir, refresh)
+	if err := loader.LoadFromDisk(); err != nil {
+		log.Println("Safety: load from disk error:", err)
+	}
+	bookmark.Checker = loader
+	go loader.RunPeriodic(context.Background())
 }
 
 // Environment variables
