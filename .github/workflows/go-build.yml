@@ -35,7 +35,7 @@ jobs:
       run: go build --tags fts5 -o tmp/fafi2 fafi2
 
     - name: Upload Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: fafi2
         path: tmp/fafi2
