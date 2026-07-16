@@ -5,7 +5,7 @@ go 1.24.7
 require (
 	github.com/advancedlogic/GoOse v0.0.0-20230923151002-b0edce1b52f8
 	github.com/joho/godotenv v1.5.1
-	github.com/mattn/go-sqlite3 v1.14.47
+	github.com/mattn/go-sqlite3 v1.14.48
 )
 
 require (
