@@ -66,13 +66,13 @@ git config core.hooksPath .githooks
 A Claude Code hook also enforces this automatically on `git push` (see `~/.claude/settings.json`).
 
 Configuration is in `.golangci.yml`:
-- `run.go: "1.24"` — targets Go 1.24 semantics; prevents false typecheck errors from Go stdlib files with `//go:build go1.26` constraints
+- `run.go: "1.25"` — targets Go 1.25 semantics
 - `build-tags: [fts5]` — ensures lint sees the same code as the build
 
 ## Go version
 
-- Module requires `go 1.24.7` (see `go.mod`)
-- Local toolchain: `go1.24.7`
+- Module requires `go 1.25.0` (see `go.mod`) — bumped for `golang.org/x/net` v0.55.0, which itself requires go1.25
+- Local toolchain: provided by devbox (`go@latest`, currently resolving to go1.26.4)
 - Use `GOTOOLCHAIN=local` in all local commands to prevent auto-download attempts
 
 ## Workflow learnings
