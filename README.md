@@ -13,7 +13,8 @@ In the latest incarnation:
 
 This is how it looks:
 
-![image](https://github.com/svandragt/fafi/assets/594871/c7f9a06c-fa2a-430b-a9be-2bc66b0615d3)
+<img width="1908" height="982" alt="Screenshot 2026-07-22 at 22-34-02 Fafi" src="https://github.com/user-attachments/assets/2bc93abc-7e91-42e1-92df-91091f847a73" />
+
 
 ## Searching
 
