@@ -75,6 +75,14 @@ Configuration is in `.golangci.yml`:
 - Local toolchain: provided by devbox (`go@latest`, currently resolving to go1.26.4)
 - Use `GOTOOLCHAIN=local` in all local commands to prevent auto-download attempts
 
+## Python history
+
+fafi was originally Python (poetry/nltk-based). That history has no shared commit with `main` — it was a from-scratch Go rewrite, not a branch-off. The old `main-python` branch was deleted; its final commit is preserved at tag `archive/main-python`.
+
+To recover it as a branch: `git checkout -b main-python archive/main-python`.
+
+Dependabot alerts for `nltk` (poetry.lock) are tied to this archived history and will keep showing as open on GitHub even though no live branch uses it — dismiss them there as "no longer used" rather than trying to patch them.
+
 ## Workflow learnings
 
 - `actions/setup-go@v5` has built-in caching — no need for a separate `actions/cache` step
