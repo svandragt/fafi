@@ -1,0 +1,101 @@
+# AGENTS.md
+
+This file provides guidance to coding agents working with code in this repository.
+
+## Overview
+
+fafi is a self-hosted bookmark indexer and search tool. A single Go binary starts an HTTP server, fetches readable content for each bookmark, and exposes FTS5 full-text search over titles + extracted text.
+
+## Architecture
+
+`main.go` wires three boot steps then serves HTTP:
+1. `bootEnvironment` — loads `.env` (godotenv)
+2. `bootDatabase` — opens SQLite, runs migration via `bookmark.BmDb.CreateTable`, seeds sample rows
+3. Goroutine: optional `integration.ImportFirefoxProfile` → `bootIndexer` (fetches missing content concurrently via `indexQueue`)
+4. `bootServer` — `http.ListenAndServe`, renders `pub/index.html` (embedded via `//go:embed`)
+
+Packages:
+- `bookmark/` — domain model, SQLite access (`BmDb` global), readability extraction, FTS5 queries, content-type probing (`probe.go`)
+- `integration/` — external sources (Firefox `places.sqlite` import)
+- `sander/` — utility helpers: env+CLI arg resolution (`GetArgFromEnvWithDefault` — CLI flag overrides env), debug state, file/string helpers
+- `pub/` — embedded HTML templates
+
+## Schema versioning
+
+Tracked via `PRAGMA user_version`; `bookmark.schemaVersion` is the latest the binary writes.
+
+- **v1** (legacy, pre-versioning): FTS5 `bookmarks(url, title, text, isScraped, dateAdded)` + sibling `bookmark_meta(url, content_type)` table. Detected when `user_version=0` AND a `bookmarks` table exists.
+- **v2**: FTS5 `bookmarks(url, title, text, content_type, isScraped UNINDEXED, dateAdded UNINDEXED)` — no sibling table. `UNINDEXED` skips tokenization for columns never used with `MATCH`.
+- **v3**: same table shape as v2; semantic-only bump asserting "no http/https scheme-only duplicates". `migrateV2toV3` collapses pairs into the https variant, moving over scraped content where the https row is empty.
+
+All migrations run automatically on boot — `migrateToV2` preserves `text` and `isScraped`, so no reindex is needed for the upgrade itself. `FAFI_RESET_INDEX=1` is now purely "force re-scrape" (clears `isScraped`). The v2 → v3 step runs `migrateV2toV3` which is a cheap idempotent http/https dedup sweep. Fresh databases are always created at the latest version. Read/write paths still branch on `Database.version` defensively; in steady state every install lands on the latest. Future cleanup: drop v1 read/write branches once telemetry shows no v1 databases left in the wild.
+
+Config: every `FAFI_FOO_BAR` env var has a `--foo-bar` CLI equivalent (resolved through `sander.GetArgFromEnvWithDefault`). See README for the full list.
+
+## Build
+
+```bash
+GOTOOLCHAIN=local go build --tags fts5 -o tmp/fafi2 fafi2
+```
+
+The `fts5` tag enables the SQLite FTS5 full-text search extension (required).
+`GOTOOLCHAIN=local` prevents Go from attempting to auto-download a newer toolchain.
+
+## Test
+
+```bash
+GOTOOLCHAIN=local go test -race ./...
+```
+
+Always run with `-race` to catch data races. Follow **red-green TDD**: write the failing test first, then make it pass.
+
+## Lint
+
+```bash
+GOTOOLCHAIN=local golangci-lint run
+```
+
+**Always check lint passes before pushing.**
+
+A git pre-push hook is committed in `.githooks/pre-push`. Activate it once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+An agent hook can also enforce this on `git push` (for Claude Code, see `~/.claude/settings.json`).
+
+Configuration is in `.golangci.yml`:
+- `run.go: "1.25"` — targets Go 1.25 semantics
+- `build-tags: [fts5]` — ensures lint sees the same code as the build
+
+## Go version
+
+- Module requires `go 1.25.0` (see `go.mod`) — bumped for `golang.org/x/net` v0.55.0, which itself requires go1.25
+- Local toolchain: provided by devbox (`go@latest`, currently resolving to go1.26.4)
+- Use `GOTOOLCHAIN=local` in all local commands to prevent auto-download attempts
+
+## Python history
+
+fafi was originally Python (poetry/nltk-based). That history has no shared commit with `main` — it was a from-scratch Go rewrite, not a branch-off. The old `main-python` branch was deleted; its final commit is preserved at tag `archive/main-python`.
+
+To recover it as a branch: `git checkout -b main-python archive/main-python`.
+
+GitHub's dependency graph kept the Python-era manifests (`poetry.lock`, `pyproject.toml`, `fafi/pyproject.toml`, two old workflows) after the rewrite, because no commit on `main` ever deleted them. Those stale entries raised Pillow, nltk and Black alerts. They were cleared on 2026-10-27 by committing an empty file at each path and then deleting it.
+
+If Python alerts reappear, list what the graph tracks:
+
+```bash
+gh api graphql -H 'Accept: application/vnd.github.hawkgirl-preview+json' -f query='{repository(owner:"svandragt",name:"fafi"){dependencyGraphManifests(first:20){nodes{blobPath}}}}'
+```
+
+For any path not on `main`, repeat the add-empty-then-delete commits, pushed separately (a PR merge nets to no change). Dismiss leftover alerts as "not used".
+
+## Workflow learnings
+
+- `actions/setup-go@v5` has built-in caching — no need for a separate `actions/cache` step
+- `go mod tidy && git diff --exit-code go.mod go.sum` in CI catches drift that a silent tidy masks
+- Single-element `strategy.matrix` adds overhead with no benefit; set `go-version` directly
+- `go build` exits non-zero on failure — a separate file-existence check is redundant
+- The `for {}` loop in `bootIndexer` was unconditionally terminated (`SA4004`) — removed the dead wrapper
+- Goroutines capturing an outer `err` variable after a void function call is a logic bug — always check what a function actually returns
