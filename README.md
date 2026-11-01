@@ -100,6 +100,8 @@ Each of the environment variables are available as a longform command-line argum
 
 ## Build and run
 
+To skip building, download `fafi2` for Linux (amd64, arm64) or macOS (arm64) from the [releases page](https://github.com/svandragt/fafi/releases).
+
 The project uses [devbox](https://www.jetify.com/devbox) to pin the Go toolchain. With devbox installed:
 
 ```shell

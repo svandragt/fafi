@@ -41,6 +41,10 @@ GOTOOLCHAIN=local go build --tags fts5 -o tmp/fafi2 fafi2
 The `fts5` tag enables the SQLite FTS5 full-text search extension (required).
 `GOTOOLCHAIN=local` prevents Go from attempting to auto-download a newer toolchain.
 
+## Release
+
+Push a tag such as `0.3.1` (no `v` prefix). `.github/workflows/release.yml` builds `fafi2` natively on Linux amd64, Linux arm64 and macOS arm64, because go-sqlite3 needs cgo. It then creates a GitHub release with an empty body and the binaries attached. Write the release notes afterwards with `gh release edit <tag> --notes-file`. fafi is no longer published to PyPI.
+
 ## Test
 
 ```bash
